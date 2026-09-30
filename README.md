@@ -29,7 +29,7 @@ Other design choices:
 You need Python 3.11 or newer.
 
 ```sh
-git clone <repo-url> tend
+git clone https://github.com/alexhergomz/Tend.git tend
 cd tend
 uv tool install --editable .     # or: pipx install --editable .
 ```
