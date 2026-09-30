@@ -22,11 +22,13 @@ Other design choices:
 - Every screen ends with a command bar that lists the keys you can use right now.
 - Missed deadlines are never hidden, and they are never shown as a red wall.
   Each one needs a decision (see [Missed dates](#missed-dates)).
+- `t plan` builds a schedule around your calendar with the same rules.
+- tend learns how long your tasks really take and corrects your estimates.
 - Your data is a plain SQLite file. Every command can print JSON.
 
 ## Install
 
-You need Python 3.11 or newer.
+You need Python 3.11 or newer. The only dependencies are `rich` and `python-dateutil`.
 
 ```sh
 git clone https://github.com/alexhergomz/Tend.git tend
@@ -100,21 +102,37 @@ day (default 4) and the slack limit for rule 1 (default 1 day).
 
 tend has two kinds of date:
 
-- `due:` is a **hard deadline**. It has a real consequence if you miss it.
+- `due:` is a **hard deadline**. Missing it has a real cost, for example a late fee.
 - `aim:` is a **soft target**. It is a date you set for yourself.
 
-When you miss a soft target, the task moves to today without a message. This
-happens twice. The third time, the task needs a decision. A missed hard deadline
-needs a decision right away.
+A task **slips** when its date passes and the task is not done.
 
-The status line shows how many tasks need a decision (`2 slipped`). Run
-`t resolve` to handle them one by one:
+- **Soft target:** the first two times, tend moves the date to today without a
+  message. The third time, the task needs a decision.
+- **Hard deadline:** the task needs a decision right away.
 
-- `n` do it today
-- `r` reschedule. You must type a date. A concrete date makes follow-through more
-  likely (Gollwitzer's work on implementation intentions).
-- `x` split it into smaller steps
-- `k` drop it. This is a valid choice, not a failure.
+tend never hides these tasks. The status line under every command shows how many
+need a decision, for example `2 slipped`. The count stays until you decide.
+
+### Deciding: `t resolve`
+
+`t resolve` (key `r`) shows the slipped tasks one at a time. For each task, you
+press one key:
+
+| Key | Choice | What changes |
+|---|---|---|
+| `n` | do it today | The date moves to today. The task goes back into the normal queue. |
+| `r` | reschedule | You type a new date. You can't skip this step, because a concrete date makes follow-through more likely (Gollwitzer's work on implementation intentions). For a hard deadline this sets a new `due:` date, so only use it if the deadline really moved. |
+| `x` | split | You type smaller steps. The steps become new tasks and the original waits for them. |
+| `k` | drop | The task is removed. This is a valid choice, not a failure. `t undo` brings it back. |
+| `q` | later | Stop for now. The remaining tasks stay in the `slipped` count. |
+
+After `n`, `r` or `x`, the slip count starts again at zero, so a missed soft
+target gets two quiet rollovers again.
+
+Example: "reply to professor" missed its hard deadline, so it gets a new one
+(`r`, then `fri`). "fix bike" missed its soft target three times, so it gets
+dropped (`k`).
 
 ![Resolving slipped tasks](docs/resolve.gif)
 
@@ -135,6 +153,85 @@ Time is saved per task and counts toward goal progress.
 
 *The GIF uses a 1 minute pomodoro and plays at 4x speed.*
 
+## Planning: `t plan` and `t gantt`
+
+`t plan` shows a schedule for today. If the working day is already over, it
+shows tomorrow.
+
+![A day plan built around a calendar event](docs/plan.png)
+
+The plan does not use a separate algorithm. For each free time slot, it asks the
+same question as `t next`: "which task comes first at this point?" It books a
+block for that task and repeats. So the plan and `t next` always agree.
+
+- **Free time** is the working window (09:00 to 18:00 by default) minus your
+  calendar events.
+- **Focus per day** is limited to `hours_per_day` (4 by default). The rest of
+  the window stays free, as a buffer for things that come up.
+- **Blocks** are at most 90 minutes, with a 10 minute gap between them.
+- **Warnings** appear when a deadline won't be met, with the amount of work
+  that doesn't fit.
+- **Nothing is saved.** The plan is rebuilt every time you run it, so it is
+  never out of date. If your day goes wrong, run `t plan` again.
+
+`t gantt` (key `c`) shows the next 7 days as a chart. Each row is a task and each
+line is the focus time for that day. `◆` marks a deadline. Use `--days 14` for a
+longer view.
+
+![The next 7 days as a gantt chart](docs/gantt.png)
+
+To export the plan to your own calendar app, run `t plan --ics > plan.ics`.
+
+### Calendar
+
+tend reads busy times from `.ics` files or URLs. Most calendar apps can give
+you one. In Google Calendar, open *Settings and sharing* for your calendar, then
+copy *Secret address in iCal format*. Add it to the config:
+
+```toml
+[calendar]
+ics = ["~/calendars/uni.ics", "https://calendar.google.com/calendar/ical/.../basic.ics"]
+```
+
+tend supports repeating events, time zones, deleted and moved repeats, and
+events marked as "free". All-day events don't block any hours. URLs are cached
+for 15 minutes. If you are offline, tend uses the last copy.
+
+## Estimate calibration
+
+Most people underestimate how long tasks take. tend measures this. When you
+finish a task that has focus time, tend compares the time you spent with the
+estimate. The **calibration factor** is the median of this ratio over your last
+20 timed tasks.
+
+If your tasks take 1.3 times your estimate, tend multiplies every estimate by
+1.3 before it computes slack or builds a plan. You don't need to change how you
+estimate.
+
+- It starts after 5 timed tasks. Before that, the factor is 1.
+- The median ignores a few extreme tasks.
+- The factor stays between 0.5 and 3.
+- `t plan` and `t review` show the current factor. To turn it off, set
+  `calibrate = false`.
+
+## Weekly review
+
+Once a week, the status line shows `weekly review due`. Run `t review` (key `v`).
+It takes about five minutes and has six steps:
+
+1. **Last 7 days:** what you finished, and each goal against its target.
+2. **Estimates:** your calibration factor, in plain words.
+3. **Inbox:** triage new tasks now, or skip.
+4. **Slipped tasks:** resolve them now, or skip.
+5. **Old tasks:** tasks older than 30 days, with no date and no focus time.
+   Keep them, give them a date, or drop them.
+6. **Goals:** if a goal has no open tasks, rule 2 can't help it. tend asks you
+   for one small next step.
+
+Press `q` at any question to stop.
+
+![The weekly review](docs/review.gif)
+
 ## Commands
 
 Each command has a one-letter key. `t d` is the same as `t done`. In interactive
@@ -153,6 +250,9 @@ mode (`t` with no arguments), you only press the letter.
 | `e` | `edit` | Change a task: `t e 12 due:fri v:3` |
 | `k` | `drop` | Remove a task you no longer need |
 | `r` | `resolve` | Decide what to do with slipped tasks |
+| `p` | `plan` | Show today's schedule (`--ics` exports it) |
+| `c` | `gantt` | Show the next 7 days as a chart (`--days 14`) |
+| `v` | `review` | Weekly review |
 | `g` | `goals` | Show goal progress. `t g add thesis 3h` adds a goal, `t g rm thesis` removes it. |
 | `w` | `wins` | Show what you finished today (`--week` for the whole week) |
 | `u` | `undo` | Undo the last change |
@@ -219,6 +319,21 @@ flow_break_ratio = 0.2
 [priority]
 hours_per_day = 4         # focused hours per day, used to compute slack
 at_risk_slack_days = 1    # rule 1 limit
+calibrate = true          # scale estimates by how long tasks really take
+
+[schedule]
+day_start = "09:00"       # t plan only books time inside this window
+day_end = "18:00"
+work_days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+max_block = 90            # longest focus block, in minutes
+break_minutes = 10        # gap between blocks
+horizon_days = 14         # how far ahead t plan checks deadlines
+
+[calendar]
+ics = []                  # .ics files or URLs with busy times
+
+[review]
+every_days = 7
 
 [slips]
 quiet_rollovers = 2       # how many times a missed soft target moves without a message
@@ -241,6 +356,9 @@ The code is small and split by job:
 | File | Job |
 |---|---|
 | `priority.py` | The three rules. Pure functions with no I/O, so you can replace them. |
+| `plan.py` | The scheduler. It calls `priority.py` for every free slot. |
+| `ics.py` | Reads calendar files |
+| `calibrate.py` | Estimate calibration |
 | `store.py` | SQLite schema, events and undo |
 | `parse.py` | Syntax for tasks, dates and durations |
 | `commands.py` | One function per command |
@@ -252,6 +370,9 @@ ffmpeg.
 
 ## Roadmap
 
-- **0.2:** learn how accurate your estimates are and correct them, plus a weekly review
-- **0.3:** `t plan` to fit tasks into your calendar, `t gantt` for a timeline, and `.ics` import
-- **0.4:** hooks (`on_done`, `on_focus_start`) and plugins. Any `t-<name>` program on your PATH becomes `t <name>`.
+- **0.1:** capture, triage, the three rules, focus timer, slipped tasks, undo, JSON
+- **0.2:** estimate calibration and the weekly review
+- **0.3:** `t plan`, `t gantt`, calendar import and `.ics` export
+- **0.4 (next):** hooks (`on_done`, `on_focus_start`) and plugins. Any `t-<name>`
+  program on your PATH becomes `t <name>`.
+- **Later:** energy windows (for example, hard tasks in the morning only)

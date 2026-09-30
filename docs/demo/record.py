@@ -43,9 +43,31 @@ def sql(query, *params):
     db.commit()
 
 
+def write_calendar():
+    """A small calendar: lectures on Tue and Thu, a meeting tomorrow, a call on Friday."""
+    today = date.today()
+    monday = today - timedelta(days=today.weekday())
+    def dt(d, h, m=0):
+        return f"{d:%Y%m%d}T{h:02d}{m:02d}00"
+    tomorrow, friday = today + timedelta(days=1), monday + timedelta(days=4)
+    events = [
+        ("Lecture", dt(monday + timedelta(days=1), 10), dt(monday + timedelta(days=1), 11, 30), "RRULE:FREQ=WEEKLY;BYDAY=TU,TH"),
+        ("Team meeting", dt(tomorrow, 14), dt(tomorrow, 15), None),
+        ("Call with supervisor", dt(friday, 12), dt(friday, 12, 45), None),
+    ]
+    lines = ["BEGIN:VCALENDAR", "VERSION:2.0"]
+    for i, (title, start, end, rrule) in enumerate(events):
+        lines += ["BEGIN:VEVENT", f"UID:demo-{i}", f"SUMMARY:{title}", f"DTSTART:{start}", f"DTEND:{end}"]
+        lines += [rrule] if rrule else []
+        lines.append("END:VEVENT")
+    lines.append("END:VCALENDAR")
+    (OUT / "demo.ics").write_text("\r\n".join(lines))
+
+
 def seed(config=""):
     DB.unlink(missing_ok=True)
-    (OUT / "config.toml").write_text(config)
+    write_calendar()
+    (OUT / "config.toml").write_text(f'[calendar]\nics = ["{OUT / "demo.ics"}"]\n' + config)
     for task in [
         "tax form due:tom e:2h v:2",
         "write ch.2 intro +thesis v:3 s:M",
@@ -61,6 +83,14 @@ def seed(config=""):
     start = datetime.now() - timedelta(days=1, hours=3)
     sql("INSERT INTO sessions (task_id, start, end, mode, minutes) VALUES (2, ?, ?, 'pomo', 50)",
         start.isoformat(timespec="seconds"), (start + timedelta(minutes=50)).isoformat(timespec="seconds"))
+    # five finished tasks that took about 1.3x their estimate, so calibration has data
+    for i, (size, actual) in enumerate([("S", 40), ("S", 35), ("M", 150), ("M", 170), ("S", 45)]):
+        done_at = (datetime.now() - timedelta(days=3 + i)).isoformat(timespec="seconds")
+        sql("INSERT INTO tasks (title, value, size, status, created, done_at) VALUES (?, 2, ?, 'done', ?, ?)",
+            f"old task {i}", size, done_at, done_at)
+        sql("INSERT INTO sessions (task_id, start, end, mode, minutes) VALUES "
+            "((SELECT MAX(id) FROM tasks), ?, ?, 'pomo', ?)", done_at, done_at, actual)
+    sql("INSERT OR REPLACE INTO meta (key, value) VALUES ('last_review', ?)", (date.today() - timedelta(days=8)).isoformat())
 
 
 class Cast:
@@ -179,6 +209,26 @@ def resolve():
     c.save()
 
 
+def planning():
+    seed()
+    c = Cast("plan", rows=24)
+    c.run("t plan", after=2)
+    c.save()
+    c = Cast("gantt", rows=22)
+    c.run("t gantt", after=2)
+    c.save()
+
+
+def review():
+    seed()
+    t("call the dentist")
+    t("g", "add", "reading", "1h")
+    c = Cast("review", rows=30)
+    c.run("t review", keys=[(3.0, "y"), (1.5, "2"), (1.0, "s"), (1.0, "\r"), (1.2, "\r"),
+                            *typed("read chapter 1 of Deep Work"), (0.8, "\r")], after=3)
+    c.save()
+
+
 def queue():
     seed()
     t("call the dentist")
@@ -190,7 +240,7 @@ def queue():
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     only = sys.argv[2:]
-    for fn in (capture, interactive, triage, focus, resolve, queue):
+    for fn in (capture, interactive, triage, focus, resolve, planning, review, queue):
         if not only or fn.__name__ in only:
             print("recording", fn.__name__, flush=True)
             fn()

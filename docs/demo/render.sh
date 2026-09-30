@@ -6,11 +6,14 @@ AGG=${AGG:-agg}
 TMP=$(mktemp -d)
 python3 docs/demo/record.py "$TMP"
 opts=(--font-family "DejaVu Sans Mono" --font-size 18 --theme monokai --idle-time-limit 3 --last-frame-duration 4)
-for n in capture interactive triage focus resolve; do
+for n in capture interactive triage focus resolve review; do
   "$AGG" -q "${opts[@]}" "$TMP/$n.cast" "docs/$n.gif"
 done
-"$AGG" -q "${opts[@]}" "$TMP/queue.cast" "$TMP/queue.gif"
-mkdir "$TMP/frames"
-ffmpeg -v error -i "$TMP/queue.gif" -fps_mode passthrough "$TMP/frames/%03d.png"
-cp "$TMP/frames/$(ls "$TMP/frames" | tail -1)" docs/queue.png
+# still images: the last frame of these sessions
+for n in queue plan gantt; do
+  "$AGG" -q "${opts[@]}" "$TMP/$n.cast" "$TMP/$n.gif"
+  mkdir "$TMP/frames-$n"
+  ffmpeg -v error -i "$TMP/$n.gif" -fps_mode passthrough "$TMP/frames-$n/%03d.png"
+  cp "$TMP/frames-$n/$(ls "$TMP/frames-$n" | tail -1)" "docs/$n.png"
+done
 rm -rf "$TMP"

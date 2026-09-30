@@ -39,8 +39,8 @@ class Ranked:
         }
 
 
-def work_left_hours(task: Task, logged_min: float = 0.0) -> float:
-    estimate = task.estimate_min or SIZE_MINUTES[task.size or DEFAULT_SIZE]
+def work_left_hours(task: Task, logged_min: float = 0.0, calibration: float = 1.0) -> float:
+    estimate = (task.estimate_min or SIZE_MINUTES[task.size or DEFAULT_SIZE]) * calibration
     return max(estimate - logged_min, 15) / 60
 
 
@@ -66,6 +66,7 @@ def rank(
     blocked: set[int] = frozenset(),
     hours_per_day: float = 4,
     at_risk_days: float = 1,
+    calibration: float = 1.0,  # learned ratio of actual time to estimated time
 ) -> list[Ranked]:
     goal_targets = goal_targets or {}
     goal_minutes = goal_minutes or {}
@@ -75,7 +76,7 @@ def rank(
     for t in tasks:
         if t.status != "open" or t.id in blocked or (t.start_after and t.start_after > today):
             continue
-        work = work_left_hours(t, logged.get(t.id, 0))
+        work = work_left_hours(t, logged.get(t.id, 0), calibration)
         due_slack = slack_days(t.due, work, today, hours_per_day) if t.due else None
         aim_slack = slack_days(t.aim, work, today, hours_per_day) if t.aim else None
         slacks = [s for s in (due_slack, aim_slack) if s is not None]

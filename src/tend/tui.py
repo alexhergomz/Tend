@@ -4,7 +4,7 @@ from . import commands, keys, ui
 from .app import App, UsageError
 from .ui import ACCENT, DIM, WARN, console
 
-SCREENS = {"l", "g", "w", "?"}  # these show a full screen, then wait for a key
+SCREENS = {"l", "g", "w", "?", "p", "c", "v", "r", "t"}  # these show a full screen, then wait for a key
 
 
 def run(app: App):
@@ -49,11 +49,11 @@ def _loop(app: App):
         try:
             if k in SCREENS:
                 console.clear()
-                app.tui = False  # full screens print directly
+                app.tui, app.nested = False, True  # full screens print directly, no command bar
                 try:
                     fn(app, [])
                 finally:
-                    app.tui = True
+                    app.tui, app.nested = True, False
                 console.print(f"\n [{DIM}]any key to go back[/]")
                 keys.readkey()
             else:

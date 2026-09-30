@@ -15,6 +15,21 @@ DEFAULTS = {
     "priority": {
         "hours_per_day": 4,  # realistic focused hours per day, used for slack
         "at_risk_slack_days": 1,  # rule 1 threshold
+        "calibrate": True,  # scale estimates by how long tasks really take
+    },
+    "schedule": {
+        "day_start": "09:00",
+        "day_end": "18:00",
+        "work_days": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+        "max_block": 90,  # minutes
+        "break_minutes": 10,
+        "horizon_days": 14,
+    },
+    "calendar": {
+        "ics": [],  # .ics files or URLs with busy times
+    },
+    "review": {
+        "every_days": 7,
     },
     "slips": {
         "quiet_rollovers": 2,  # soft targets roll forward silently this many times
@@ -37,6 +52,21 @@ flow_break_ratio = 0.2    # flow mode: break earned = 20% of time worked
 [priority]
 hours_per_day = 4         # realistic focused hours per day (used to compute slack)
 at_risk_slack_days = 1    # rule 1: a deadline with this much slack or less comes first
+calibrate = true          # learn from focus sessions how long tasks really take
+
+[schedule]
+day_start = "09:00"       # t plan only books time inside this window
+day_end = "18:00"
+work_days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+max_block = 90            # longest focus block, minutes
+break_minutes = 10        # gap between blocks
+horizon_days = 14         # how far ahead t plan looks for deadline problems
+
+[calendar]
+ics = []                  # busy times, e.g. ["~/cal/uni.ics", "https://.../basic.ics"]
+
+[review]
+every_days = 7            # show "review due" after this many days
 
 [slips]
 quiet_rollovers = 2       # a missed soft target rolls forward quietly this many times

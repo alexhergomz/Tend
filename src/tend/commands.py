@@ -1,8 +1,8 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from rich.markup import escape
 
-from . import config, fmt, keys, parse, slips, ui
+from . import config, fmt, keys, parse, slips, ui, views
 from . import focus as focus_timer
 from .app import App, UsageError
 from .model import Task
@@ -267,11 +267,20 @@ def cmd_resolve(app: App, args):
     if not todo:
         app.say(f" [{DIM}]Nothing has slipped.[/]")
         return app.bar("next")
-    console.print(f" [{DIM}]Slipped tasks need one decision each. Dropping is a valid choice.[/]")
+    console.print(f" [bold]{len(todo)} task{'s' * (len(todo) > 1)} missed {'their' if len(todo) > 1 else 'its'} date.[/] "
+                  f"[{DIM}]Pick one option for each:[/]")
+    for key, name, what in (
+        ("n", "do it today", "the date moves to today"),
+        ("r", "reschedule", "you type a new date"),
+        ("x", "split", "break it into smaller steps"),
+        ("k", "drop", "remove it (u brings it back)"),
+        ("q", "later", "stop here, the rest stay in the slipped count"),
+    ):
+        console.print(f"   [bold {ACCENT}]{key}[/]  {name:<12}[{DIM}]{what}[/]")
     for t in todo:
         hard = bool(t.due and t.due < app.today)
         console.print(f"\n {_t(t)}  [{WARN}]{slips.why(t, app.today)}[/]")
-        k = ui.choose("", {"n": "do it today", "r": "reschedule", "x": "split", "k": "drop", "q": "later"})
+        k = ui.choose("", {"n": "today", "r": "reschedule", "x": "split", "k": "drop", "q": "later"})
         if k == "q":
             break
         if k == "k":
@@ -375,6 +384,160 @@ def cmd_wins(app: App, args):
     app.bar("done")
 
 
+# ── planning ────────────────────────────────────────────────────────────
+def _days_arg(args, default: int) -> int:
+    for i, a in enumerate(args):
+        if a.lstrip("-") == "days" and i + 1 < len(args) and args[i + 1].isdigit():
+            return max(1, min(int(args[i + 1]), 31))
+        if a.lstrip("-") in ("week", "w"):
+            return 7
+    return default
+
+
+def cmd_plan(app: App, args):
+    plan, notes = app.build_plan()
+    if "--ics" in args:
+        return print(views.to_ics(plan), end="")
+    if app.json:
+        return app.emit({
+            "blocks": [{"task_id": b.task.id, "title": b.task.title, "start": b.start, "end": b.end, "rule": b.rule}
+                       for b in plan.blocks],
+            "events": [{"title": e.title, "start": e.start, "end": e.end} for e in plan.events],
+            "late": [{"task_id": l.task.id, "title": l.task.title, "due": l.task.due, "finish": l.finish,
+                      "minutes_left": round(l.minutes_left)} for l in plan.late],
+            "calibration": app.calibration.factor,
+        })
+    for n in notes:
+        console.print(f" [{WARN}]{escape(n)}[/]")
+    day = next((d for d in plan.days if plan.on(d)), app.today)
+    if day != app.today:
+        console.print(f" [{DIM}]Nothing more planned today.[/]")
+    views.day_plan(plan, day, app.today)
+    console.print()
+    views.warnings(plan, app.today)
+    views.summary(plan, 7, app.calibration)
+    app.bar("plan")
+
+
+def cmd_gantt(app: App, args):
+    days = _days_arg(args, 7)
+    plan, notes = app.build_plan(days)
+    if app.json:
+        return cmd_plan(app, args)
+    for n in notes:
+        console.print(f" [{WARN}]{escape(n)}[/]")
+    day_start, day_end = app.schedule_times()
+    views.gantt(plan, days, app.today, app.cfg["priority"]["hours_per_day"], day_start, day_end)
+    console.print()
+    views.warnings(plan, app.today)
+    views.summary(plan, days, app.calibration)
+    app.bar("plan")
+
+
+def cmd_review(app: App, args):
+    since = app.today - timedelta(days=7)
+    last = app.store.get_meta("last_review")
+    ago = f"last one {(app.today - datetime.fromisoformat(last).date()).days} days ago" if last else "first one"
+    console.print(f" [bold]Weekly review[/] [{DIM}]· {ago} · q stops at any question[/]")
+    app.nested = True
+    try:
+        _review(app, since)
+    finally:
+        app.nested = False
+    app.bar("next")
+
+
+def _review(app: App, since):
+
+    def step(n, title):
+        console.print(f"\n [bold {ACCENT}]{n}[/] [bold]{title}[/]")
+
+    step(1, "Last 7 days")
+    done = app.store.done_since(since)
+    console.print(f"   {len(done)} done [{DIM}]·[/] {fmt.minutes(app.store.focused_since(since))} focused")
+    spent = app.store.goal_minutes(since)
+    for g in app.store.goals():
+        if g.weekly_min:
+            m = spent.get(g.name, 0)
+            mark = f"[{ACCENT}]✓[/]" if m >= g.weekly_min else f"[{DIM}]·[/]"
+            console.print(f"   {mark} {escape(g.name)} [{DIM}]{fmt.minutes(m)} of {fmt.minutes(g.weekly_min)}[/]")
+
+    step(2, "Estimates")
+    cal = app.calibration
+    if cal.active:
+        word = "longer" if cal.factor > 1 else "less time"
+        console.print(f"   Tasks took [bold]×{cal.factor:.1f}[/] your estimate [{DIM}](median of the last {cal.samples} "
+                      f"timed tasks). Deadlines and plans already use this.[/]" if abs(cal.factor - 1) >= 0.05 else
+                      f"   Your estimates are accurate [{DIM}](last {cal.samples} timed tasks).[/]")
+        if abs(cal.factor - 1) >= 0.05:
+            console.print(f"   [{DIM}]In short: things take {word} than you expect.[/]")
+    else:
+        console.print(f"   [{DIM}]Not enough data yet: {cal.samples} of 5 finished tasks have focus time. "
+                      f"Use t focus and this step will start to learn.[/]")
+
+    def offer(n, title, count, fn, what):
+        step(n, title)
+        if not count:
+            console.print(f"   [{DIM}]Nothing to do.[/]")
+            return True
+        k = ui.choose(f"  {count} {what}. Do it now?", {"y": "yes", "n": "skip", "q": "stop"})
+        if k == "y":
+            fn(app, [])
+        return k != "q"
+
+    inbox = sum(1 for t in app.store.tasks() if not t.triaged)
+    if not offer(3, "Inbox", inbox, cmd_triage, f"task{'s' * (inbox != 1)} to triage"):
+        return
+    slipped = len(app.slipped())
+    if not offer(4, "Slipped tasks", slipped, cmd_resolve, f"task{'s' * (slipped != 1)} to resolve"):
+        return
+
+    step(5, "Old tasks")
+    logged = app.store.logged_by_task()
+    cutoff = (app.today - timedelta(days=30)).isoformat()
+    old = [t for t in app.store.tasks() if t.created[:10] < cutoff and not t.due and not t.aim
+           and not logged.get(t.id) and t.id not in app.store.blocked_ids()]
+    if not old:
+        console.print(f"   [{DIM}]Nothing older than 30 days without a date.[/]")
+    for t in old:
+        console.print(f"   {_t(t)} [{DIM}]added {t.created[:10]}[/]")
+        k = ui.choose("  ", {"enter": "keep", "a": "set a date", "k": "drop", "q": "stop"})
+        if k == "q":
+            return
+        if k == "k":
+            _drop(app, t)
+        elif k == "a":
+            while True:
+                try:
+                    when = parse.parse_date(ui.ask("   soft target › "), app.today)
+                    break
+                except parse.ParseError as e:
+                    console.print(f"   [{WARN}]{e}[/]")
+            with app.store.event("review", f"aim #{t.id} {t.title}"):
+                t.aim = when
+                app.store.update(t)
+
+    step(6, "Goals")
+    open_by_goal: dict[str, int] = {}
+    for t in app.store.tasks():
+        if t.goal:
+            open_by_goal[t.goal] = open_by_goal.get(t.goal, 0) + 1
+    empty = [g for g in app.store.goals() if g.weekly_min and not open_by_goal.get(g.name)]
+    if not empty:
+        console.print(f"   [{DIM}]Every goal with a target has at least one open task.[/]")
+    for g in empty:
+        console.print(f"   {escape(g.name)} [{DIM}]has no open tasks, so rule 2 can't move it forward.[/]")
+        title = ui.ask(f"   next small step for {g.name} (enter to skip) › ")
+        if title:
+            t = Task(id=None, title=title, goal=g.name, value=3, size="S")
+            with app.store.event("add", f"add {title}"):
+                app.store.insert(t)
+            console.print(f"   [{ACCENT}]+[/] {_t(t)} [{DIM}]#{t.id}[/]")
+
+    app.store.set_meta("last_review", app.today.isoformat())
+    console.print(f"\n [{ACCENT}]✓[/] Review done. [{DIM}]Next one in {app.cfg['review']['every_days']} days.[/]")
+
+
 def cmd_help(app: App, args):
     ui.help_screen(config.config_path(), config.data_path())
 
@@ -382,7 +545,8 @@ def cmd_help(app: App, args):
 COMMANDS = {
     "next": cmd_next, "focus": cmd_focus, "done": cmd_done, "skip": cmd_skip, "split": cmd_split,
     "add": cmd_add, "triage": cmd_triage, "ls": cmd_ls, "edit": cmd_edit, "drop": cmd_drop,
-    "resolve": cmd_resolve, "goals": cmd_goals, "wins": cmd_wins, "undo": cmd_undo, "help": cmd_help,
+    "resolve": cmd_resolve, "plan": cmd_plan, "gantt": cmd_gantt, "review": cmd_review,
+    "goals": cmd_goals, "wins": cmd_wins, "undo": cmd_undo, "help": cmd_help,
 }
 ALIASES = {k: name for k, name, _ in ui.COMMANDS} | {"list": "ls", "goal": "goals", "log": "wins"}
 

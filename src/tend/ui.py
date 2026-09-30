@@ -28,6 +28,9 @@ COMMANDS = [
     ("e", "edit", "change a task:  t e 12 due:fri v:3"),
     ("k", "drop", "let a task go"),
     ("r", "resolve", "decide what to do with slipped tasks"),
+    ("p", "plan", "today's schedule, built with the same rules"),
+    ("c", "gantt", "the next 7 days as a chart  (--days 14)"),
+    ("v", "review", "weekly review, about 5 minutes"),
     ("g", "goals", "goals and weekly progress  (g add thesis 3h)"),
     ("w", "wins", "what you got done today  (--week)"),
     ("u", "undo", "undo the last change"),
@@ -78,6 +81,8 @@ def status_line(counts: dict):
         parts.append(f"[{WARN}]{counts['slipped']} slipped[/]")
     if counts.get("inbox"):
         parts.append(f"[{DIM}]{counts['inbox']} in inbox[/]")
+    if counts.get("review"):
+        parts.append(f"[{DIM}]weekly review due[/]")
     if parts:
         console.print(" " + f"[{DIM}] · [/]".join(parts))
 
