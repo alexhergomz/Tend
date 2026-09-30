@@ -35,7 +35,8 @@ def day_plan(plan: Plan, day: date, today: date):
             color = WARN if item.rule == 1 else ACCENT
             label = RULE_LABEL[item.rule]
             meta = f"#{item.task.id}" + (f" · {escape(item.task.goal)}" if item.task.goal else "")
-            console.print(f"{when}[{color}]━[/] {escape(item.task.title)}  [{DIM}]{meta}"
+            energy = f" · @{item.task.energy}" if item.task.energy else ""
+            console.print(f"{when}[{color}]━[/] {escape(item.task.title)}  [{DIM}]{meta}{energy}"
                           f"{' · ' + label if label else ''}[/]")
         else:
             console.print(f"{when}[{DIM}]· {escape(item.title)}[/]")
@@ -63,8 +64,15 @@ def summary(plan: Plan, days: int, calibration):
     left = sum(m for _, m in plan.unplanned)
     if left > 0.5:
         console.print(f" [{DIM}]{fmt.minutes(left)} of open work doesn't fit in the next {len(plan.days)} days.[/]")
-    if calibration.active and abs(calibration.factor - 1) >= 0.05:
-        console.print(f" [{DIM}]Estimates are scaled ×{calibration.factor:.1f}, learned from {calibration.samples} tasks.[/]")
+    notes = []
+    if calibration.time.active and abs(calibration.time.factor - 1) >= 0.05:
+        notes.append(f"estimates ×{calibration.time.factor:.1f}")
+    if calibration.hard.days:
+        notes.append(f"deadlines {fmt.days(calibration.hard.days)} earlier")
+    if calibration.soft.days:
+        notes.append(f"soft targets {fmt.days(calibration.soft.days)} earlier")
+    if notes:
+        console.print(f" [{DIM}]From your history: {', '.join(notes)} · t stats[/]")
 
 
 def gantt(plan: Plan, days: int, today: date, hours_per_day: float, day_start, day_end, max_rows: int = 15):

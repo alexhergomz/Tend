@@ -17,7 +17,7 @@ ACCENT, WARN, DIM = "cyan", "yellow", "grey50"
 
 # key, command, what it does
 COMMANDS = [
-    ("n", "next", "the one thing to do now"),
+    ("n", "next", "the one thing to do now  (--low · --high energy)"),
     ("f", "focus", "focus timer on it  (--pomo · --flow · --box 45)"),
     ("d", "done", "mark it done"),
     ("s", "skip", "skip it for today, no questions asked"),
@@ -33,6 +33,7 @@ COMMANDS = [
     ("v", "review", "weekly review, about 5 minutes"),
     ("g", "goals", "goals and weekly progress  (g add thesis 3h)"),
     ("w", "wins", "what you got done today  (--week)"),
+    ("i", "stats", "how your plans usually go: time, dates, push-backs"),
     ("u", "undo", "undo the last change"),
     ("?", "help", "this list"),
 ]
@@ -55,6 +56,10 @@ def meta(t: Task, today: date, warn_due: bool = False) -> Text:
         parts.append((f"due {fmt.day(t.due, today)}", WARN if warn_due else DIM))
     if t.aim:
         parts.append((f"aim {fmt.day(t.aim, today)}", DIM))
+    if t.energy:
+        parts.append((f"@{t.energy}", DIM))
+    if t.pushes >= 2:
+        parts.append((f"pushed {t.pushes}×", DIM))
     if not t.triaged:
         parts.append(("inbox", DIM))
     out = Text()
@@ -124,10 +129,14 @@ def help_screen(config_path, data_path):
         "t write ch.2 intro +thesis due:fri v:3 e:2h",
         "+goal   due:<date> hard deadline   aim:<date> soft target   after:<date> hide until",
         "v:1..3 value (nice to have · matters · really matters)   s:S|M|L size   e:45m estimate",
+        "@high / @low energy: hard work goes in high-energy hours   ·   @any clears",
         "dates: today tom fri +3d +2w oct20 10-20 2026-10-20 eow eom   ·   due:none clears",
         "--json on any command prints machine-readable output",
     ):
         console.print("   " + escape(line), style=DIM)
+    console.print()
+    console.print(Text(" Plugins and hooks", "bold"))
+    console.print(f"   [{DIM}]any t-<name> program on your PATH runs as t <name> · t plugins lists them and your hooks[/]")
     console.print()
     console.print(f"   [{DIM}]config {config_path}\n   data   {data_path}[/]")
 

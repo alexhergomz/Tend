@@ -32,3 +32,9 @@ def clock(seconds: float) -> str:
     m, s = divmod(int(seconds), 60)
     h, m = divmod(m, 60)
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
+
+
+def days(n: float) -> str:
+    n = round(n, 1)
+    n = int(n) if n == int(n) else n
+    return f"{n} day" if n == 1 else f"{n} days"

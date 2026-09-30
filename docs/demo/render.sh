@@ -10,7 +10,7 @@ for n in capture interactive triage focus resolve review; do
   "$AGG" -q "${opts[@]}" "$TMP/$n.cast" "docs/$n.gif"
 done
 # still images: the last frame of these sessions
-for n in queue plan gantt; do
+for n in queue plan gantt stats plugins; do
   "$AGG" -q "${opts[@]}" "$TMP/$n.cast" "$TMP/$n.gif"
   mkdir "$TMP/frames-$n"
   ffmpeg -v error -i "$TMP/$n.gif" -fps_mode passthrough "$TMP/frames-$n/%03d.png"

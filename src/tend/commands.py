@@ -1,8 +1,9 @@
 from datetime import datetime, timedelta
 
 from rich.markup import escape
+from rich.padding import Padding
 
-from . import config, fmt, keys, parse, slips, ui, views
+from . import config, fmt, hooks, keys, parse, slips, ui, views
 from . import focus as focus_timer
 from .app import App, UsageError
 from .model import Task
@@ -20,7 +21,14 @@ def _add_goal_hint(app: App, goal: str | None):
 
 
 # ── doing ───────────────────────────────────────────────────────────────
+def _energy_flag(app: App, args):
+    for a in args:
+        if a.lstrip("-") in ("low", "high"):
+            app.energy_override = a.lstrip("-")
+
+
 def cmd_next(app: App, args):
+    _energy_flag(app, args)
     ranked = app.ranked()
     if app.json:
         return app.emit(ranked[0].to_json() if ranked else None)
@@ -56,9 +64,11 @@ def cmd_focus(app: App, args):
     if not keys.interactive():
         raise UsageError("focus needs an interactive terminal")
     start = datetime.now()
+    app.hook("on_focus_start", t, mode=mode)
     result = focus_timer.run(t.title, ui.meta(t, app.today), mode, app.cfg, box_min)
     if result.minutes >= 0.5:
         app.store.add_session(t.id, start, datetime.now(), mode, round(result.minutes, 1))
+    app.hook("on_focus_end", t, mode=mode, minutes=round(result.minutes, 1), outcome=result.outcome)
     app.say(f" [{ACCENT}]●[/] focused {fmt.minutes(result.minutes)} on {_t(t)}")
     if result.outcome == "done":
         _complete(app, t)
@@ -78,6 +88,7 @@ def _complete(app: App, t: Task):
             app.say(f" [{ACCENT}]✓[/] all steps done · {_t(parent)}")
             parent = app.store.task(parent.parent) if parent.parent else None
     app.store.set_meta("current", None)
+    app.hook("on_done", app.store.task(t.id))
     n = len(app.store.done_since(app.today))
     app.say(f" [{ACCENT}]✓[/] {_t(t)}  [{DIM}]{n} done today[/]")
 
@@ -100,6 +111,7 @@ def cmd_skip(app: App, args):
         t.skip_date = app.today
         app.store.update(t)
     app.store.set_meta("current", None)
+    app.hook("on_skip", t)
     app.say(f" [{DIM}]↷ skipped for today:[/] {escape(t.title)}")
     if not app.tui:
         cmd_next(app, [])
@@ -158,6 +170,7 @@ def cmd_add(app: App, args):
     with app.store.event("add") as ev:
         app.store.insert(t)
         ev["summary"] = f"add #{t.id} {t.title}"
+    app.hook("on_add", t)
     if app.json:
         return app.emit(t.to_json())
     where = "" if t.triaged else f" [{DIM}]→ inbox[/]"
@@ -203,6 +216,7 @@ def _drop(app: App, t: Task):
             app.store.update(cur)
             stack.extend(app.store.children(cur.id))
     app.store.set_meta("current", None)
+    app.hook("on_drop", t)
     app.say(f" [{DIM}]let go:[/] {escape(t.title)} [{DIM}]· u to undo[/]")
 
 
@@ -318,6 +332,7 @@ def cmd_resolve(app: App, args):
 
 # ── looking ─────────────────────────────────────────────────────────────
 def cmd_ls(app: App, args):
+    _energy_flag(app, args)
     ranked = app.ranked()
     if app.json:
         return app.emit([r.to_json() for r in ranked])
@@ -405,7 +420,7 @@ def cmd_plan(app: App, args):
             "events": [{"title": e.title, "start": e.start, "end": e.end} for e in plan.events],
             "late": [{"task_id": l.task.id, "title": l.task.title, "due": l.task.due, "finish": l.finish,
                       "minutes_left": round(l.minutes_left)} for l in plan.late],
-            "calibration": app.calibration.factor,
+            "corrections": app.corrections.to_json(),
         })
     for n in notes:
         console.print(f" [{WARN}]{escape(n)}[/]")
@@ -415,7 +430,7 @@ def cmd_plan(app: App, args):
     views.day_plan(plan, day, app.today)
     console.print()
     views.warnings(plan, app.today)
-    views.summary(plan, 7, app.calibration)
+    views.summary(plan, 7, app.corrections)
     app.bar("plan")
 
 
@@ -430,7 +445,7 @@ def cmd_gantt(app: App, args):
     views.gantt(plan, days, app.today, app.cfg["priority"]["hours_per_day"], day_start, day_end)
     console.print()
     views.warnings(plan, app.today)
-    views.summary(plan, days, app.calibration)
+    views.summary(plan, days, app.corrections)
     app.bar("plan")
 
 
@@ -462,18 +477,8 @@ def _review(app: App, since):
             mark = f"[{ACCENT}]✓[/]" if m >= g.weekly_min else f"[{DIM}]·[/]"
             console.print(f"   {mark} {escape(g.name)} [{DIM}]{fmt.minutes(m)} of {fmt.minutes(g.weekly_min)}[/]")
 
-    step(2, "Estimates")
-    cal = app.calibration
-    if cal.active:
-        word = "longer" if cal.factor > 1 else "less time"
-        console.print(f"   Tasks took [bold]×{cal.factor:.1f}[/] your estimate [{DIM}](median of the last {cal.samples} "
-                      f"timed tasks). Deadlines and plans already use this.[/]" if abs(cal.factor - 1) >= 0.05 else
-                      f"   Your estimates are accurate [{DIM}](last {cal.samples} timed tasks).[/]")
-        if abs(cal.factor - 1) >= 0.05:
-            console.print(f"   [{DIM}]In short: things take {word} than you expect.[/]")
-    else:
-        console.print(f"   [{DIM}]Not enough data yet: {cal.samples} of 5 finished tasks have focus time. "
-                      f"Use t focus and this step will start to learn.[/]")
+    step(2, "How your plans usually go")
+    _corrections(app, indent="   ")
 
     def offer(n, title, count, fn, what):
         step(n, title)
@@ -535,7 +540,70 @@ def _review(app: App, since):
             console.print(f"   [{ACCENT}]+[/] {_t(t)} [{DIM}]#{t.id}[/]")
 
     app.store.set_meta("last_review", app.today.isoformat())
+    app.hook("on_review")
     console.print(f"\n [{ACCENT}]✓[/] Review done. [{DIM}]Next one in {app.cfg['review']['every_days']} days.[/]")
+
+
+def _corrections(app: App, indent: str = " "):
+    c = app.corrections
+    rows = []
+    if c.time.active:
+        what = f"tasks take [bold]×{c.time.factor:.1f}[/] your estimate"
+        use = "estimates are scaled" if abs(c.time.factor - 1) >= 0.05 else "no change needed"
+    else:
+        what, use = f"[{DIM}]not enough data[/]", "needs 5 finished tasks with focus time"
+    rows.append(("Time", what, c.time.samples, use))
+    for label, shift, date_word in (("Soft dates", c.soft, "soft targets"), ("Deadlines", c.hard, "deadlines")):
+        if shift.median_late is None or not shift.active:
+            what, use = f"[{DIM}]not enough data[/]", "needs 5 finished tasks with this kind of date"
+        else:
+            late = shift.median_late
+            what = (f"done [bold]{fmt.days(late)}[/] after the first date (median)" if late > 0 else
+                    f"done {fmt.days(-late)} before the first date" if late < 0 else "done on the first date")
+            use = f"{date_word} count as {fmt.days(shift.days)} earlier" if shift.days else "no change needed"
+        rows.append((label, what, shift.samples, use))
+    p = c.pushes
+    if p.dated:
+        what = f"{p.pushed} of {p.dated} dated tasks pushed back" + (f", {p.average:.1f}× each" if p.pushed else "")
+    else:
+        what = f"[{DIM}]no dated tasks yet[/]"
+    rows.append(("Push-backs", what, p.dated, "data only, for plugins"))
+    from rich.table import Table
+    tbl = Table.grid(padding=(0, 2))
+    tbl.add_column(style="bold", no_wrap=True)
+    tbl.add_column()
+    for label, what, n, use in rows:
+        tbl.add_row(label, f"{what}\n[{DIM}]{n} tasks · {use}[/]")
+    if p.top:
+        most = ", ".join(f"{escape(title)} ({n}×)" for _, title, n in p.top[:3])
+        tbl.add_row("", f"[{DIM}]most pushed now: {most}[/]")
+    console.print(Padding(tbl, (0, 0, 0, len(indent))))
+
+
+def cmd_stats(app: App, args):
+    if app.json:
+        return app.emit(app.corrections.to_json())
+    console.print(f" [bold]How your plans usually go[/] [{DIM}]· median of your last 20 finished tasks[/]")
+    _corrections(app)
+    app.bar("stats")
+
+
+def cmd_plugins(app: App, args):
+    found = hooks.list_plugins()
+    hook_files = [(e, p) for e in hooks.EVENTS for p in hooks.scripts(e)]
+    if app.json:
+        return app.emit({"plugins": [{"name": n, "path": p} for n, p in found],
+                         "hooks": [{"event": e, "path": str(p)} for e, p in hook_files]})
+    console.print(" [bold]Plugins[/] [{DIM}]· programs named t-<name> on your PATH[/]".replace("{DIM}", DIM))
+    for name, path in found:
+        console.print(f"   t {escape(name):<14}[{DIM}]{escape(path)}[/]")
+    if not found:
+        console.print(f"   [{DIM}]none[/]")
+    console.print(f"\n [bold]Hooks[/] [{DIM}]· {escape(str(hooks.hooks_dir()))}[/]")
+    for event, path in hook_files:
+        console.print(f"   {event:<16}[{DIM}]{escape(str(path))}[/]")
+    if not hook_files:
+        console.print(f"   [{DIM}]none · events: {', '.join(hooks.EVENTS)}[/]")
 
 
 def cmd_help(app: App, args):
@@ -546,7 +614,8 @@ COMMANDS = {
     "next": cmd_next, "focus": cmd_focus, "done": cmd_done, "skip": cmd_skip, "split": cmd_split,
     "add": cmd_add, "triage": cmd_triage, "ls": cmd_ls, "edit": cmd_edit, "drop": cmd_drop,
     "resolve": cmd_resolve, "plan": cmd_plan, "gantt": cmd_gantt, "review": cmd_review,
-    "goals": cmd_goals, "wins": cmd_wins, "undo": cmd_undo, "help": cmd_help,
+    "goals": cmd_goals, "wins": cmd_wins, "stats": cmd_stats, "plugins": cmd_plugins,
+    "undo": cmd_undo, "help": cmd_help,
 }
 ALIASES = {k: name for k, name, _ in ui.COMMANDS} | {"list": "ls", "goal": "goals", "log": "wins"}
 

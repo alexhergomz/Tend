@@ -1,0 +1,21 @@
+#!/usr/bin/env python3
+"""Hook: append every finished task to a CSV file.
+
+Install: copy to ~/.config/tend/hooks/on_done and chmod +x.
+tend sends the event as JSON on stdin: {"event", "time", "task": {...}}.
+"""
+import csv
+import json
+import os
+import sys
+from pathlib import Path
+
+event = json.load(sys.stdin)
+task = event["task"]
+out = Path(os.environ["TEND_DB"]).parent / "done.csv"
+new = not out.exists()
+with out.open("a", newline="") as f:
+    w = csv.writer(f)
+    if new:
+        w.writerow(["time", "id", "title", "goal", "estimate_min", "pushes"])
+    w.writerow([event["time"], task["id"], task["title"], task["goal"], task["estimate_min"], task["pushes"]])

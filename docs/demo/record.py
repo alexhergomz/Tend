@@ -28,6 +28,7 @@ ENV = {
     "TERM": "xterm-256color",
     "COLUMNS": str(COLS),
     "LINES": str(ROWS),
+    "PATH": f"{Path(__file__).resolve().parents[2] / 'examples' / 'plugins'}{os.pathsep}{os.environ['PATH']}",
 }
 PROMPT = "\x1b[36m~\x1b[0m \x1b[1m$\x1b[0m "
 random.seed(4)
@@ -86,8 +87,10 @@ def seed(config=""):
     # five finished tasks that took about 1.3x their estimate, so calibration has data
     for i, (size, actual) in enumerate([("S", 40), ("S", 35), ("M", 150), ("M", 170), ("S", 45)]):
         done_at = (datetime.now() - timedelta(days=3 + i)).isoformat(timespec="seconds")
-        sql("INSERT INTO tasks (title, value, size, status, created, done_at) VALUES (?, 2, ?, 'done', ?, ?)",
-            f"old task {i}", size, done_at, done_at)
+        first_aim = (datetime.now() - timedelta(days=5 + i + i % 3)).date().isoformat()  # done 2-4 days late
+        sql("INSERT INTO tasks (title, value, size, status, created, done_at, aim, first_aim, pushes) "
+            "VALUES (?, 2, ?, 'done', ?, ?, ?, ?, ?)", f"old task {i}", size, done_at, done_at,
+            done_at[:10], first_aim, i % 3)
         sql("INSERT INTO sessions (task_id, start, end, mode, minutes) VALUES "
             "((SELECT MAX(id) FROM tasks), ?, ?, 'pomo', ?)", done_at, done_at, actual)
     sql("INSERT OR REPLACE INTO meta (key, value) VALUES ('last_review', ?)", (date.today() - timedelta(days=8)).isoformat())
@@ -229,6 +232,18 @@ def review():
     c.save()
 
 
+def stats():
+    seed()
+    for when in ("tom", "+3d", "+6d"):  # fix bike keeps moving later
+        t("e", "6", f"aim:{when}")
+    c = Cast("stats", rows=20)
+    c.run("t stats", after=2)
+    c.save()
+    c = Cast("plugins", rows=9)
+    c.run("t pushed", after=2)
+    c.save()
+
+
 def queue():
     seed()
     t("call the dentist")
@@ -240,7 +255,7 @@ def queue():
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     only = sys.argv[2:]
-    for fn in (capture, interactive, triage, focus, resolve, planning, review, queue):
+    for fn in (capture, interactive, triage, focus, resolve, planning, review, stats, queue):
         if not only or fn.__name__ in only:
             print("recording", fn.__name__, flush=True)
             fn()

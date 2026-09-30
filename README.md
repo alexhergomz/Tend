@@ -23,7 +23,10 @@ Other design choices:
 - Missed deadlines are never hidden, and they are never shown as a red wall.
   Each one needs a decision (see [Missed dates](#missed-dates)).
 - `t plan` builds a schedule around your calendar with the same rules.
-- tend learns how long your tasks really take and corrects your estimates.
+- tend learns from your history: how long tasks really take, and how late you
+  usually finish compared to your dates. It corrects for both.
+- Energy windows keep hard tasks in the hours when you think best.
+- Hooks and plugins let you add anything else, in any language.
 - Your data is a plain SQLite file. Every command can print JSON.
 
 ## Install
@@ -197,22 +200,58 @@ tend supports repeating events, time zones, deleted and moved repeats, and
 events marked as "free". All-day events don't block any hours. URLs are cached
 for 15 minutes. If you are offline, tend uses the last copy.
 
-## Estimate calibration
+## Learning from your history
 
-Most people underestimate how long tasks take. tend measures this. When you
-finish a task that has focus time, tend compares the time you spent with the
-estimate. The **calibration factor** is the median of this ratio over your last
-20 timed tasks.
+Most people underestimate how long tasks take, and finish later than the date
+they set. tend measures both, and corrects for them without asking you to
+change how you estimate. Run `t stats` (key `i`) to see the numbers.
 
-If your tasks take 1.3 times your estimate, tend multiplies every estimate by
-1.3 before it computes slack or builds a plan. You don't need to change how you
-estimate.
+![How your plans usually go](docs/stats.png)
 
-- It starts after 5 timed tasks. Before that, the factor is 1.
-- The median ignores a few extreme tasks.
-- The factor stays between 0.5 and 3.
-- `t plan` and `t review` show the current factor. To turn it off, set
-  `calibrate = false`.
+All corrections use the same simple model:
+
+- The **median** of your last 20 finished tasks. A few extreme tasks don't move it.
+- Nothing changes until there are **5 tasks** of that kind.
+- The correction has **limits**, so bad data can't make it extreme.
+
+| What | Measured as | Correction | Limits |
+|---|---|---|---|
+| **Time** | focus time ÷ estimate, for tasks with timer sessions | Estimates are multiplied by it. It affects slack and plans. | ×0.5 to ×3 |
+| **Soft dates** | days between the *first* soft target and the day the task was done | Soft targets count as that many days earlier, so they get urgent sooner. | 0 to 7 days |
+| **Deadlines** | the same, for the *first* hard deadline | Rule 1 warns that many days earlier. | 0 to 7 days |
+| **Push-backs** | how many times a task's date moved to a later day | None. Shown only. | – |
+
+The date corrections use the first date a task had. If you move a date, the
+original still counts, so moving dates doesn't hide lateness. Finishing early
+never moves your dates later.
+
+Push-backs have no correction, because there is no simple model that uses them
+reliably. The data is there for plugins: `tasks.pushes`, `tasks.first_due`,
+`tasks.first_aim`, the full history in `events`, and `t stats --json`. After a
+task is pushed twice, its line shows `pushed 2×`.
+
+To turn off all corrections, set `calibrate = false`.
+
+## Energy windows
+
+Some tasks need a clear head, and some don't. Tell tend when your good hours are:
+
+```toml
+[energy]
+high = ["09:00-12:00"]
+low = ["14:00-16:00", "20:00-22:00"]
+```
+
+Then tag tasks with `@high` (hard work) or `@low` (easy work). Untagged tasks
+fit anywhere.
+
+- **`t plan`** only books `@high` tasks inside high windows. In a high window,
+  it books `@low` tasks only if nothing else fits.
+- **`t next`** puts `@high` tasks after the others during a low window, and
+  `@low` tasks after the others during a high window. The reason line says so.
+- **Tired right now?** `t next --low` treats the current time as a low window.
+  `--high` does the opposite.
+- **Deadlines win.** A task whose deadline is at risk (rule 1) ignores energy.
 
 ## Weekly review
 
@@ -220,7 +259,7 @@ Once a week, the status line shows `weekly review due`. Run `t review` (key `v`)
 It takes about five minutes and has six steps:
 
 1. **Last 7 days:** what you finished, and each goal against its target.
-2. **Estimates:** your calibration factor, in plain words.
+2. **How your plans usually go:** the same numbers as `t stats`.
 3. **Inbox:** triage new tasks now, or skip.
 4. **Slipped tasks:** resolve them now, or skip.
 5. **Old tasks:** tasks older than 30 days, with no date and no focus time.
@@ -239,7 +278,7 @@ mode (`t` with no arguments), you only press the letter.
 
 | Key | Command | What it does |
 |---|---|---|
-| `n` | `next` | Show the one task to do now |
+| `n` | `next` | Show the one task to do now (`--low`, `--high` for your energy now) |
 | `f` | `focus` | Start the focus timer (`--pomo`, `--flow`, `--box 45`) |
 | `d` | `done` | Mark the task as done |
 | `s` | `skip` | Skip the task for today |
@@ -255,6 +294,8 @@ mode (`t` with no arguments), you only press the letter.
 | `v` | `review` | Weekly review |
 | `g` | `goals` | Show goal progress. `t g add thesis 3h` adds a goal, `t g rm thesis` removes it. |
 | `w` | `wins` | Show what you finished today (`--week` for the whole week) |
+| `i` | `stats` | How your plans usually go: time, dates, push-backs |
+| | `plugins` | List installed plugins and hooks |
 | `u` | `undo` | Undo the last change |
 | `?` | `help` | Show all commands and the syntax |
 
@@ -274,6 +315,7 @@ Words become the title. Tokens set the fields. You can put tokens anywhere.
 | `v:1` to `v:3` | Value | `v:3` |
 | `s:S`, `s:M`, `s:L` | Size | `s:M` |
 | `e:<time>` | Estimate. Also sets the size. | `e:45m`, `e:2h`, `e:1h30m` |
+| `@high`, `@low` | Energy the task needs. `@any` clears it. | `@high` |
 
 Dates: `today`, `tom`, `mon` to `sun`, `+3d`, `+2w`, `oct20`, `10-20`,
 `2026-10-20`, `eow` (end of week), `eom` (end of month). Use `due:none` to
@@ -282,6 +324,61 @@ clear a date.
 `!2` and `~45m` also work, but zsh changes them before tend can read them.
 Use them only inside quotes.
 
+## Hooks and plugins
+
+tend stays small. If you want more, add it with hooks and plugins. You can
+write them in any language.
+
+### Plugins
+
+Any program named `t-<name>` on your PATH runs as `t <name>`. It gets the
+arguments you typed, plus these environment variables:
+
+| Variable | Value |
+|---|---|
+| `TEND_DB` | path to the SQLite database |
+| `TEND_CONFIG` | path to the config file |
+| `TEND_VERSION` | tend's version |
+
+A plugin can read data with `t ls --json` (or any command with `--json`), or with
+SQL. Commands always come first: a plugin can't replace a built-in command.
+`t plugins` lists what is installed.
+
+Two examples are in `examples/plugins/`:
+
+- `t-md` prints the queue as a Markdown checklist (`t md > todo.md`).
+- `t-pushed` lists the most pushed-back tasks with the history of each date,
+  read straight from the database.
+
+![The t-pushed example plugin](docs/plugins.png)
+
+### Hooks
+
+A hook is an executable file in `~/.config/tend/hooks/`, named after an event.
+To run several hooks for one event, put them in a folder instead, such as
+`hooks/on_done.d/`.
+
+| Event | When |
+|---|---|
+| `on_add` | a task was added |
+| `on_done` | a task was finished |
+| `on_drop` | a task was dropped |
+| `on_skip` | a task was skipped |
+| `on_focus_start` | a focus session started |
+| `on_focus_end` | a focus session ended (with `minutes` and `outcome`) |
+| `on_review` | the weekly review was finished |
+| `on_change` | any change at all, with the full row before and after |
+
+The hook gets the event as JSON on stdin:
+
+```json
+{"event": "on_done", "time": "2026-09-29T18:40:12", "task": {"id": 4, "title": "reply to professor", ...}}
+```
+
+Hooks run in the background. They can't slow tend down or change what it does.
+Their output goes to `hooks.log`, next to the database. `examples/hooks/on_done`
+appends each finished task to a CSV file.
+
 ## Your data
 
 All data is in one SQLite file. Run `t ?` to see its path. By default it is
@@ -289,7 +386,7 @@ All data is in one SQLite file. Run `t ?` to see its path. By default it is
 
 | Table | Contents |
 |---|---|
-| `tasks` | All tasks, including done and dropped ones |
+| `tasks` | All tasks, including done and dropped ones. `first_due`, `first_aim` and `pushes` keep the date history. |
 | `goals` | Goals and their weekly targets, in minutes |
 | `sessions` | Focus timer sessions |
 | `events` | Every change, with a copy of the task before and after. Undo uses this table. |
@@ -319,7 +416,7 @@ flow_break_ratio = 0.2
 [priority]
 hours_per_day = 4         # focused hours per day, used to compute slack
 at_risk_slack_days = 1    # rule 1 limit
-calibrate = true          # scale estimates by how long tasks really take
+calibrate = true          # learn time and date corrections from finished tasks
 
 [schedule]
 day_start = "09:00"       # t plan only books time inside this window
@@ -335,6 +432,10 @@ ics = []                  # .ics files or URLs with busy times
 [review]
 every_days = 7
 
+[energy]
+high = []                 # e.g. ["09:00-12:00"]
+low = []                  # e.g. ["14:00-16:00"]
+
 [slips]
 quiet_rollovers = 2       # how many times a missed soft target moves without a message
 
@@ -342,7 +443,8 @@ quiet_rollovers = 2       # how many times a missed soft target moves without a 
 footer = true             # show the command bar
 ```
 
-Set `TEND_DB` or `TEND_CONFIG` to use a different data file or config file.
+Set `TEND_DB`, `TEND_CONFIG` or `TEND_HOOKS` to use a different data file,
+config file or hooks folder.
 
 ## Development
 
@@ -358,7 +460,9 @@ The code is small and split by job:
 | `priority.py` | The three rules. Pure functions with no I/O, so you can replace them. |
 | `plan.py` | The scheduler. It calls `priority.py` for every free slot. |
 | `ics.py` | Reads calendar files |
-| `calibrate.py` | Estimate calibration |
+| `calibrate.py` | Corrections learned from your history |
+| `energy.py` | Energy windows |
+| `hooks.py` | Hooks and plugin lookup |
 | `store.py` | SQLite schema, events and undo |
 | `parse.py` | Syntax for tasks, dates and durations |
 | `commands.py` | One function per command |
@@ -373,6 +477,7 @@ ffmpeg.
 - **0.1:** capture, triage, the three rules, focus timer, slipped tasks, undo, JSON
 - **0.2:** estimate calibration and the weekly review
 - **0.3:** `t plan`, `t gantt`, calendar import and `.ics` export
-- **0.4 (next):** hooks (`on_done`, `on_focus_start`) and plugins. Any `t-<name>`
-  program on your PATH becomes `t <name>`.
-- **Later:** energy windows (for example, hard tasks in the morning only)
+- **0.4:** hooks and plugins
+- **0.5:** energy windows, date corrections, push-back data
+
+The core is meant to stay small. New ideas should start as plugins.

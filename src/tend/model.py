@@ -3,7 +3,8 @@ from datetime import date
 
 SIZES = {"S": 1, "M": 2, "L": 3}  # WSJF denominator
 SIZE_MINUTES = {"S": 30, "M": 120, "L": 240}  # assumed effort when no estimate is given
-DATE_FIELDS = ("due", "aim", "start_after", "skip_date")
+DATE_FIELDS = ("due", "aim", "start_after", "skip_date", "first_due", "first_aim")
+ENERGY = ("high", "low")
 
 
 @dataclass
@@ -23,6 +24,10 @@ class Task:
     skip_date: date | None = None
     created: str = ""
     done_at: str | None = None
+    energy: str | None = None  # high / low / None (any time)
+    first_due: date | None = None  # the first hard deadline this task had
+    first_aim: date | None = None  # the first soft target this task had
+    pushes: int = 0  # times a date moved later, never reset
 
     @property
     def triaged(self) -> bool:

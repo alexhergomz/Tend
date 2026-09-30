@@ -1,6 +1,6 @@
 """Quick-add syntax: plain words form the title, tokens set fields.
 
-    +goal  due:fri  aim:fri  after:mon  v:1..3  e:45m  s:S|M|L
+    +goal  due:fri  aim:fri  after:mon  v:1..3  e:45m  s:S|M|L  @high @low
 
 `!2` and `~45m` also work, but zsh expands them unless they're inside quotes.
 """
@@ -81,6 +81,8 @@ def parse_tokens(args: list[str], today: date) -> tuple[str, dict]:
         elif m := re.fullmatch(r"(due|aim|after):(.*)", w, re.I):
             key = {"due": "due", "aim": "aim", "after": "start_after"}[m[1].lower()]
             f[key] = None if m[2].lower() in CLEAR else parse_date(m[2], today)
+        elif m := re.fullmatch(r"@(high|low|any)", w, re.I):
+            f["energy"] = None if m[1].lower() == "any" else m[1].lower()
         elif m := re.fullmatch(r"(?:!|v:)([123])", w):
             f["value"] = int(m[1])
         elif m := re.fullmatch(r"(?:s|size):([sml])", w, re.I):

@@ -1,7 +1,7 @@
 import json
 from datetime import date, datetime, time, timedelta
 
-from . import calibrate, config, ics, plan, priority, slips, ui
+from . import calibrate, config, energy, hooks, ics, plan, priority, slips, ui
 from .model import Task
 from .store import Store
 
@@ -14,6 +14,7 @@ FOOTERS = {
     "empty": ["a", "g", "w"],
     "goals": ["n", "g"],
     "plan": ["n", "c", "f"],
+    "stats": ["n", "p"],
 }
 
 
@@ -29,19 +30,41 @@ class App:
         self.tui = tui
         self.flash: list[str] = []
         self.nested = False  # inside another command (review): no command bar
+        self.energy_override: str | None = None  # t next --low / --high
+        self.store.on_event = self._on_change
         self.reload()
 
     def reload(self):
         self.today = date.today()
+        self.__dict__.pop("_corrections", None)
         slips.roll_over(self.store, self.today, self.cfg["slips"]["quiet_rollovers"])
 
     @property
     def week_start(self) -> date:
         return self.today - timedelta(days=self.today.weekday())
 
+    def _on_change(self, kind: str, summary: str, changes: list):
+        hooks.fire("on_change", {"kind": kind, "summary": summary, "changes": changes})
+
+    def hook(self, event: str, task: Task | None = None, **extra):
+        hooks.fire(event, {"task": task.to_json() if task else None, **extra})
+
+    @property
+    def corrections(self) -> calibrate.Corrections:
+        if not hasattr(self, "_corrections"):
+            self._corrections = calibrate.corrections(self.store, self.cfg["priority"]["calibrate"])
+        return self._corrections
+
     @property
     def calibration(self) -> calibrate.Calibration:
-        return calibrate.load(self.store, self.cfg["priority"]["calibrate"])
+        return self.corrections.time
+
+    @property
+    def windows(self) -> energy.Windows:
+        return energy.parse(self.cfg["energy"])
+
+    def energy_now(self) -> str | None:
+        return self.energy_override or energy.at(self.windows, datetime.now())
 
     def rank_inputs(self) -> dict:
         """Everything the three rules need, besides the tasks and the date."""
@@ -55,11 +78,13 @@ class App:
             logged=self.store.logged_by_task(),
             blocked=self.store.blocked_ids(),
             at_risk_days=p["at_risk_slack_days"],
-            calibration=self.calibration.factor,
+            calibration=self.corrections.time.factor,
+            hard_shift=self.corrections.hard.days,
+            soft_shift=self.corrections.soft.days,
         )
 
     def ranked(self) -> list[priority.Ranked]:
-        return priority.rank(self.store.tasks(), today=self.today,
+        return priority.rank(self.store.tasks(), today=self.today, energy_now=self.energy_now(),
                              hours_per_day=self.cfg["priority"]["hours_per_day"], **self.rank_inputs())
 
     def schedule_times(self) -> tuple[time, time]:
@@ -80,7 +105,8 @@ class App:
             day_start=day_start, day_end=day_end, work_days=work_days,
             hours_per_day=self.cfg["priority"]["hours_per_day"],
             focused_today=self.store.focused_since(self.today),
-            max_block=sc["max_block"], break_minutes=sc["break_minutes"], **self.rank_inputs(),
+            max_block=sc["max_block"], break_minutes=sc["break_minutes"],
+            energy_windows=self.windows, **self.rank_inputs(),
         )
         return result, warnings
 

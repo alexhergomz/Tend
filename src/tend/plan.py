@@ -10,7 +10,7 @@ from the current state every time you run it.
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 
-from . import priority
+from . import energy, priority
 from .ics import Event
 from .model import Task
 
@@ -86,7 +86,11 @@ def schedule(
     blocked: set[int] = frozenset(),
     at_risk_days: float = 1,
     calibration: float = 1.0,
+    hard_shift: int = 0,
+    soft_shift: int = 0,
+    energy_windows: energy.Windows | None = None,
 ) -> Plan:
+    windows = energy_windows or {}
     goal_targets = goal_targets or {}
     week_goal = dict(goal_minutes or {})
     logged = dict(logged or {})
@@ -103,24 +107,28 @@ def schedule(
             week_goal = {}
         if day.weekday() not in work_days:
             continue
-        slots = free_slots(day, day_start, day_end, events, now)
+        slots = [piece for s, t in free_slots(day, day_start, day_end, events, now)
+                 for piece in energy.split(s, t, windows)]
         budget = hours_per_day * 60 - (focused_today if day == today else 0)
-        plan.capacity[day] = max(0, min(budget, sum((t - s).total_seconds() / 60 for s, t in slots)))
+        plan.capacity[day] = max(0, min(budget, sum((t - s).total_seconds() / 60 for s, t, _ in slots)))
         worked_goal = goal_worked_today if day == today else False
 
         while slots and budget >= min_block:
             pending = [t for t in open_tasks if remaining[t.id] > 0.5]
             if not pending:
                 break
+            s, t, level = slots[0]
             ranked = priority.rank(
                 pending, today=day, goal_targets=goal_targets, goal_minutes=week_goal,
                 goal_worked_today=worked_goal, logged=logged, blocked=blocked,
                 hours_per_day=hours_per_day, at_risk_days=at_risk_days, calibration=calibration,
+                hard_shift=hard_shift, soft_shift=soft_shift, energy_now=level,
             )
-            if not ranked:
-                break
-            pick = ranked[0]
-            s, t = slots[0]
+            fits = [r for r in ranked if r.rule == 1 or energy.allowed(r.task.energy, level, windows)]
+            if not fits:
+                slots.pop(0)
+                continue
+            pick = fits[0]
             room = (t - s).total_seconds() / 60
             length = min(remaining[pick.task.id], max_block, budget, room)
             if length < min(min_block, remaining[pick.task.id]):

@@ -28,7 +28,11 @@ CREATE TABLE IF NOT EXISTS tasks (
     slips        INTEGER NOT NULL DEFAULT 0,
     skip_date    TEXT,
     created      TEXT NOT NULL,
-    done_at      TEXT
+    done_at      TEXT,
+    energy       TEXT CHECK (energy IN ('high', 'low')),
+    first_due    TEXT,             -- first hard deadline, kept when the date moves
+    first_aim    TEXT,             -- first soft target, kept when the date moves
+    pushes       INTEGER NOT NULL DEFAULT 0  -- times a date moved later
 );
 CREATE TABLE IF NOT EXISTS goals (
     name       TEXT PRIMARY KEY,
@@ -53,12 +57,20 @@ CREATE TABLE IF NOT EXISTS events (
     undone  INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
-PRAGMA user_version = 1;
 """
+VERSION = 2
+NEW_COLUMNS = {  # added in schema version 2
+    "energy": "TEXT CHECK (energy IN ('high', 'low'))",
+    "first_due": "TEXT",
+    "first_aim": "TEXT",
+    "pushes": "INTEGER NOT NULL DEFAULT 0",
+}
+DEFAULTS = {"pushes": 0, "slips": 0}
 
 COLS = [
     "id", "title", "goal", "parent", "value", "size", "estimate_min", "due", "aim",
     "start_after", "status", "slips", "skip_date", "created", "done_at",
+    "energy", "first_due", "first_aim", "pushes",
 ]
 NOT_UNDOABLE = ("rollover",)
 
@@ -75,6 +87,35 @@ class Store:
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
         self._changes: list | None = None
+        self.on_event = None  # called as on_event(kind, summary, changes) after each commit
+        self._migrate()
+
+    def _migrate(self):
+        have = {r["name"] for r in self.db.execute("PRAGMA table_info(tasks)")}
+        added = [c for c in NEW_COLUMNS if c not in have]
+        for c in added:
+            self.db.execute(f"ALTER TABLE tasks ADD COLUMN {c} {NEW_COLUMNS[c]}")
+        if added:
+            self._backfill_dates()
+        self.db.execute(f"PRAGMA user_version = {VERSION}")
+        self.db.commit()
+
+    def _backfill_dates(self):
+        """Rebuild first_due, first_aim and pushes from the event history."""
+        first: dict[int, dict] = {}
+        pushes: dict[int, int] = {}
+        for row in self.db.execute("SELECT changes FROM events WHERE undone = 0 ORDER BY id"):
+            for ch in json.loads(row["changes"]):
+                before, after = ch.get("before") or {}, ch.get("after") or {}
+                for key in ("due", "aim"):
+                    if after.get(key) and not first.get(ch["id"], {}).get(key):
+                        first.setdefault(ch["id"], {})[key] = after[key]
+                    if before.get(key) and after.get(key) and after[key] > before[key]:
+                        pushes[ch["id"]] = pushes.get(ch["id"], 0) + 1
+        for r in self.db.execute("SELECT id, due, aim FROM tasks").fetchall():
+            f = first.get(r["id"], {})
+            self.db.execute("UPDATE tasks SET first_due = ?, first_aim = ?, pushes = ? WHERE id = ?",
+                            (f.get("due") or r["due"], f.get("aim") or r["aim"], pushes.get(r["id"], 0), r["id"]))
 
     # ── events ──────────────────────────────────────────────────────────
     @contextmanager
@@ -88,6 +129,8 @@ class Store:
                 (now_iso(), kind, ev["summary"], json.dumps(self._changes)),
             )
             self.db.commit()
+            if self.on_event:
+                self.on_event(kind, ev["summary"], self._changes)
         except BaseException:
             self.db.rollback()
             raise
@@ -114,7 +157,7 @@ class Store:
                 b = ch["before"]
                 self.db.execute(
                     f"INSERT OR REPLACE INTO tasks ({','.join(COLS)}) VALUES ({','.join('?' * len(COLS))})",
-                    [b[c] for c in COLS],
+                    [b.get(c, DEFAULTS.get(c)) for c in COLS],
                 )
         self.db.execute("UPDATE events SET undone = 1 WHERE id = ?", (row["id"],))
         self.db.commit()
@@ -144,6 +187,8 @@ class Store:
     def insert(self, t: Task) -> int:
         if not t.created:
             t.created = now_iso()
+        t.first_due = t.first_due or t.due
+        t.first_aim = t.first_aim or t.aim
         row = t.to_row()
         cols = [c for c in COLS if c != "id"]
         cur = self.db.execute(
@@ -154,7 +199,14 @@ class Store:
         return t.id
 
     def update(self, t: Task):
-        before = self.task(t.id).to_row()
+        old = self.task(t.id)
+        before = old.to_row()
+        for key in ("due", "aim"):
+            new, prev = getattr(t, key), getattr(old, key)
+            if new and not getattr(t, f"first_{key}"):
+                setattr(t, f"first_{key}", new)
+            if new and prev and new > prev:
+                t.pushes += 1
         row = t.to_row()
         cols = [c for c in COLS if c != "id"]
         self.db.execute(f"UPDATE tasks SET {','.join(c + ' = ?' for c in cols)} WHERE id = ?", [row[c] for c in cols] + [t.id])

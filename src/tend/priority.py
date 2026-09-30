@@ -6,11 +6,16 @@ Rule 2 (Big Rocks / Eat the Frog): until you've worked on a goal today, the
     next task comes from the goal furthest behind its weekly target.
 Rule 3 (WSJF): everything else by (value + urgency) / size, ties to the oldest.
 
-Tasks skipped today go to the end.
+Tasks skipped today go to the end. During a high or low energy window, tasks
+tagged with the other energy level go after the rest (deadlines at risk still
+come first).
+
+Two date corrections from your history can apply (see calibrate.py): hard
+deadlines and soft targets count as `hard_shift` / `soft_shift` days earlier.
 """
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
 from . import fmt
 from .model import SIZE_MINUTES, SIZES, Task
@@ -67,6 +72,9 @@ def rank(
     hours_per_day: float = 4,
     at_risk_days: float = 1,
     calibration: float = 1.0,  # learned ratio of actual time to estimated time
+    hard_shift: int = 0,  # days: treat deadlines as this much earlier
+    soft_shift: int = 0,  # days: treat soft targets as this much earlier
+    energy_now: str | None = None,  # "high" / "low" window, or None
 ) -> list[Ranked]:
     goal_targets = goal_targets or {}
     goal_minutes = goal_minutes or {}
@@ -77,8 +85,10 @@ def rank(
         if t.status != "open" or t.id in blocked or (t.start_after and t.start_after > today):
             continue
         work = work_left_hours(t, logged.get(t.id, 0), calibration)
-        due_slack = slack_days(t.due, work, today, hours_per_day) if t.due else None
-        aim_slack = slack_days(t.aim, work, today, hours_per_day) if t.aim else None
+        due = t.due - timedelta(days=hard_shift) if t.due else None
+        aim = t.aim - timedelta(days=soft_shift) if t.aim else None
+        due_slack = slack_days(due, work, today, hours_per_day) if due else None
+        aim_slack = slack_days(aim, work, today, hours_per_day) if aim else None
         slacks = [s for s in (due_slack, aim_slack) if s is not None]
         u = urgency(min(slacks) if slacks else None)
         v, size = t.value or DEFAULT_VALUE, t.size or DEFAULT_SIZE
@@ -88,6 +98,8 @@ def rank(
                 reason = f"past due · ~{fmt.hours(work)} of work left"
             else:
                 reason = f"at risk · ~{fmt.hours(work)} of work, {max(due_slack, 0):.1f} days of slack"
+                if hard_shift:
+                    reason += f" (with a {hard_shift} day margin)"
             rule = 1
         else:
             reason = f"(value {v} + urgency {u}) / size {SIZES[size]} = {score:.1f}"
@@ -101,6 +113,11 @@ def rank(
 
     first = sorted((r for r in active if r.rule == 1), key=lambda r: (r.slack, r.task.id))
     rest = sorted((r for r in active if r.rule == 3), key=lambda r: (-r.score, r.task.created, r.task.id))
+    other = {"high": "low", "low": "high"}.get(energy_now)
+    later = [r for r in rest if other and r.task.energy == other]
+    rest = [r for r in rest if r not in later]
+    for r in later:
+        r.reason = f"saved for {other}-energy time · " + r.reason
 
     big_rock = []
     if not goal_worked_today:
@@ -118,4 +135,4 @@ def rank(
 
     for r in skipped:
         r.reason = "skipped today · " + r.reason
-    return first + big_rock + rest + skipped
+    return first + big_rock + rest + later + skipped

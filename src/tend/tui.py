@@ -4,7 +4,7 @@ from . import commands, keys, ui
 from .app import App, UsageError
 from .ui import ACCENT, DIM, WARN, console
 
-SCREENS = {"l", "g", "w", "?", "p", "c", "v", "r", "t"}  # these show a full screen, then wait for a key
+SCREENS = {"l", "g", "w", "?", "p", "c", "v", "r", "t", "i"}  # these show a full screen, then wait for a key
 
 
 def run(app: App):

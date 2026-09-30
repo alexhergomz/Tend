@@ -15,7 +15,7 @@ DEFAULTS = {
     "priority": {
         "hours_per_day": 4,  # realistic focused hours per day, used for slack
         "at_risk_slack_days": 1,  # rule 1 threshold
-        "calibrate": True,  # scale estimates by how long tasks really take
+        "calibrate": True,  # learn time and date corrections from finished tasks
     },
     "schedule": {
         "day_start": "09:00",
@@ -30,6 +30,10 @@ DEFAULTS = {
     },
     "review": {
         "every_days": 7,
+    },
+    "energy": {
+        "high": [],  # e.g. ["09:00-12:00"]
+        "low": [],  # e.g. ["14:00-16:00"]
     },
     "slips": {
         "quiet_rollovers": 2,  # soft targets roll forward silently this many times
@@ -52,7 +56,7 @@ flow_break_ratio = 0.2    # flow mode: break earned = 20% of time worked
 [priority]
 hours_per_day = 4         # realistic focused hours per day (used to compute slack)
 at_risk_slack_days = 1    # rule 1: a deadline with this much slack or less comes first
-calibrate = true          # learn from focus sessions how long tasks really take
+calibrate = true          # learn time and date corrections from finished tasks
 
 [schedule]
 day_start = "09:00"       # t plan only books time inside this window
@@ -67,6 +71,10 @@ ics = []                  # busy times, e.g. ["~/cal/uni.ics", "https://.../basi
 
 [review]
 every_days = 7            # show "review due" after this many days
+
+[energy]
+high = []                 # hard work hours, e.g. ["09:00-12:00"]; tasks tagged @high go here
+low = []                  # easy work hours, e.g. ["14:00-16:00"]; tasks tagged @low fit here
 
 [slips]
 quiet_rollovers = 2       # a missed soft target rolls forward quietly this many times
