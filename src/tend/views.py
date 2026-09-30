@@ -98,7 +98,7 @@ def gantt(plan: Plan, days: int, today: date, hours_per_day: float, day_start, d
                     for e in plan.events if e.start.date() == d and e.end > datetime.combine(d, day_start)
                     and e.start < datetime.combine(d, day_end))
             n = round(h / window * (cell - 1)) if h > 0 else 0
-            busy.append(Text("─" * max(n, 1 if h > 0 else 0), DIM))
+            busy.append(Text("▃" * max(n, 1 if h > 0 else 0), DIM))
         console.print(Text(" " + "calendar".ljust(title_w), DIM) + cells(busy))
 
     order: list = []
@@ -111,7 +111,7 @@ def gantt(plan: Plan, days: int, today: date, hours_per_day: float, day_start, d
         for d in span:
             m = sum(b.minutes for b in plan.blocks if b.task.id == t.id and b.start.date() == d)
             n = max(1, round(m / (hours_per_day * 60) * (cell - 1))) if m > 0 else 0
-            v = Text("━" * n, color)
+            v = Text("▆" * n, color)
             if t.due == d:
                 v.append("◆", WARN)
             row.append(v)
@@ -127,6 +127,12 @@ def gantt(plan: Plan, days: int, today: date, hours_per_day: float, day_start, d
 
     totals = [Text(f"{sum(b.minutes for b in plan.on(d)) / 60:.1f}".rstrip("0").rstrip("."), DIM) for d in span]
     console.print(Text(" " + "focus hours".ljust(title_w), DIM) + cells(totals))
+    legend = Text.assemble(" ", ("▆", ACCENT), (" planned focus   ", DIM), ("◆", WARN), (" deadline", DIM))
+    if plan.late:
+        legend.append_text(Text.assemble("   ", ("▆", WARN), (" late task", DIM)))
+    if plan.events:
+        legend.append_text(Text.assemble("   ", ("▃", DIM), (" calendar", DIM)))
+    console.print(legend)
 
 
 def to_ics(plan: Plan) -> str:
