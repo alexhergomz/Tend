@@ -763,3 +763,7 @@ The GIFs are recordings of the real program: `docs/demo/render.sh` rebuilds them
 Tend 1.0 has everything on the original roadmap. From here, the core stays small
 and new ideas start as plugins. [ROADMAP.md](ROADMAP.md) has the history and the
 rules each release follows.
+
+## License
+
+MIT. See [LICENSE](LICENSE).

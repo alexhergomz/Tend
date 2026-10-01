@@ -4,6 +4,8 @@ version = "1.0.0"
 description = "A calm task manager for the terminal: one task at a time, and why"
 readme = "README.md"
 requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "alexhergomz" }]
 keywords = ["tasks", "todo", "adhd", "productivity", "cli", "tui", "pomodoro", "planning", "gantt"]
 classifiers = [
@@ -38,7 +40,7 @@ build-backend = "hatchling.build"
 packages = ["src/tend"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src/tend", "tests", "docs/t.1", "docs/data.md", "README.md", "CHANGELOG.md", "ROADMAP.md"]
+include = ["src/tend", "tests", "docs/t.1", "docs/data.md", "README.md", "CHANGELOG.md", "ROADMAP.md", "LICENSE"]
 
 [dependency-groups]
 dev = ["pytest>=8", "ruff>=0.6"]
