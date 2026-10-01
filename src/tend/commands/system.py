@@ -223,3 +223,53 @@ def cmd_help(app: App, args):
         return ui.command_help(cmd)
     ui.help_screen(lambda c: features.command_enabled(app.cfg, c.name), __version__,
                    config.config_path(), config.data_path(), app.on("plugins") or app.on("hooks"))
+
+
+# ── standalone: these run without loading your data ─────────────────────
+@command("doctor", group="Setup", help="check the setup, with a fix for each problem", standalone=True,
+         details="Checks the config, the database, backups, calendars, hooks, plugins and reminders. Changes nothing.")
+def cmd_doctor(args, json_out: bool):
+    import json
+
+    from .. import doctor
+
+    checks = doctor.run()
+    if json_out:
+        print(json.dumps([c.to_json() for c in checks], indent=2))
+    else:
+        marks = {"ok": f"[{ACCENT}]✓[/]", "info": f"[{DIM}]·[/]", "warn": f"[{WARN}]![/]", "error": f"[{WARN}]✗[/]"}
+        tbl = Table.grid(padding=(0, 1))
+        tbl.add_column(no_wrap=True)
+        tbl.add_column(style="bold", no_wrap=True)
+        tbl.add_column(overflow="fold")
+        for c in checks:
+            text = escape(c.text) + (f"\n[{DIM}]fix: {escape(c.fix)}[/]" if c.fix and c.level != "ok" else "")
+            tbl.add_row(" " + marks[c.level], c.area, text)
+        console.print(tbl)
+        problems = sum(c.level in ("warn", "error") for c in checks)
+        summary = "No problems found." if not problems else f"{fmt.count(problems, 'thing')} to look at."
+        console.print(f"\n [{DIM}]{summary}[/]")
+    if any(c.level == "error" for c in checks):
+        sys.exit(1)
+
+
+@command("completion", group="Setup", help="shell completion script", usage="bash | zsh | fish", standalone=True,
+         flags=("bash", "zsh", "fish"),
+         details="""bash: add  eval "$(t completion bash)"  to ~/.bashrc
+zsh:  add  source <(t completion zsh)  to ~/.zshrc, after compinit
+fish: t completion fish > ~/.config/fish/completions/t.fish""")
+def cmd_completion(args, json_out: bool):
+    from .. import completion
+
+    if not args or args[0] not in completion.SCRIPTS:
+        raise UsageError("usage: t completion bash | zsh | fish")
+    print(completion.SCRIPTS[args[0]], end="")
+
+
+@command("_complete", group="Setup", help="used by the completion scripts", standalone=True, hidden=True)
+def cmd_complete(args, json_out: bool):
+    from .. import completion
+
+    out = completion.complete(args)
+    if out:
+        print(out)

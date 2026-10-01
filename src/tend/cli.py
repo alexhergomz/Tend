@@ -2,6 +2,8 @@
 
 import sys
 
+from rich.markup import escape
+
 from . import __version__, config, hooks, keys, parse, registry
 from .ui import WARN, console
 
@@ -27,6 +29,9 @@ def main(argv: list[str] | None = None):
             if keys.interactive() and not json_out:
                 return tui.run(App(tui=True))
             argv = ["next"]
+        cmd = registry.find(argv[0])
+        if cmd and cmd.standalone:  # doctor, completion: no data loaded, works with a broken config
+            return cmd.fn(argv[1:], json_out)
         app = App(json_out=json_out)
         fn = commands.lookup(argv[0], app)
         if not fn and app.on("plugins") and (plugin := hooks.find_plugin(argv[0])):
@@ -39,10 +44,10 @@ def main(argv: list[str] | None = None):
         else:
             commands.capture.cmd_add(app, argv)  # anything that isn't a command or plugin is a new task
     except (UsageError, parse.ParseError) as e:
-        console.print(f" [{WARN}]{e}[/]")
+        console.print(f" [{WARN}]{escape(str(e))}[/]")
         sys.exit(1)
     except config.ConfigError as e:
-        console.print(f" [{WARN}]Your config file has a problem:[/] {e}\n"
+        console.print(f" [{WARN}]Your config file has a problem:[/] {escape(str(e))}\n"
                       " Fix it, or run t doctor for a full check.")
         sys.exit(2)
     except KeyboardInterrupt:

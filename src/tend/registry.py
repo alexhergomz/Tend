@@ -24,6 +24,7 @@ class Command:
     aliases: tuple[str, ...] = ()
     hidden: bool = False  # not listed anywhere (internal commands)
     takes_id: bool = False  # first argument may be a task id (for completion)
+    standalone: bool = False  # runs without loading your data: fn(args, json_out)
     flags: tuple[str, ...] = field(default_factory=tuple)  # for completion
 
 
