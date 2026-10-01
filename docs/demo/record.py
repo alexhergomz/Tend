@@ -97,8 +97,8 @@ def seed(config=""):
 
 
 class Cast:
-    def __init__(self, name, rows=ROWS):
-        self.name, self.rows, self.now, self.events = name, rows, 0.0, []
+    def __init__(self, name, rows=ROWS, cols=COLS):
+        self.name, self.rows, self.cols, self.now, self.events = name, rows, cols, 0.0, []
 
     def out(self, text):
         self.events.append([round(self.now, 3), "o", text])
@@ -119,13 +119,13 @@ class Cast:
         self.wait(0.4)
         self.out("\r\n")
 
-    def run(self, command, keys=(), after=1.8, speed=1.0):
+    def run(self, command, keys=(), after=1.8, speed=1.0, env=None):
         """Type `command`, run it in a pty, send keys as (delay, text) pairs."""
         self.prompt(command)
         pid, fd = pty.fork()
         if pid == 0:
-            os.execvpe("sh", ["sh", "-c", command], ENV)
-        fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", self.rows, COLS, 0, 0))
+            os.execvpe("sh", ["sh", "-c", command], {**ENV, "COLUMNS": str(self.cols), **(env or {})})
+        fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", self.rows, self.cols, 0, 0))
         base, started = self.now, time.monotonic()
         queue = list(keys)
         next_at = started + (queue[0][0] if queue else 0)
@@ -153,7 +153,7 @@ class Cast:
         self.prompt()
         self.wait(2)
         self.out("")
-        header = {"version": 2, "width": COLS, "height": self.rows, "env": {"TERM": "xterm-256color"}}
+        header = {"version": 2, "width": self.cols, "height": self.rows, "env": {"TERM": "xterm-256color"}}
         with open(OUT / f"{self.name}.cast", "w") as f:
             f.write(json.dumps(header) + "\n")
             for e in self.events:
@@ -262,6 +262,36 @@ def repeating():
     c.save()
 
 
+def themes():
+    """The same screen in each theme, narrow, for a side-by-side picture."""
+    for theme in ("dark", "light", "plain"):
+        seed(f'[ui]\ntheme = "{theme}"\n')
+        c = Cast(f"theme-{theme}", rows=13, cols=60)
+        c.run("t next", after=1)
+        c.save()
+
+
+def doctor():
+    seed()
+    hooks = OUT / "hooks"
+    hooks.mkdir(exist_ok=True)
+    (hooks / "on_finish").write_text("#!/bin/sh\n")  # a misspelled event, for doctor to find
+    (hooks / "on_finish").chmod(0o755)
+    c = Cast("doctor", rows=16)
+    # paths show as ~/... the way they do for you, and only the plugins you installed are listed
+    plain_path = os.pathsep.join(p for p in os.environ["PATH"].split(os.pathsep) if "examples" not in p)
+    c.run("t doctor", after=2, env={"HOME": str(OUT), "PATH": plain_path})
+    c.save()
+    (hooks / "on_finish").unlink()
+
+
+def help_screen():
+    seed()
+    c = Cast("help", rows=62, cols=96)
+    c.run("t help", after=2, env={"HOME": str(OUT)})
+    c.save()
+
+
 def queue():
     seed()
     t("call the dentist")
@@ -273,7 +303,7 @@ def queue():
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     only = sys.argv[2:]
-    for fn in (capture, interactive, triage, focus, resolve, planning, review, stats, states, repeating, queue):
+    for fn in (capture, interactive, triage, focus, resolve, planning, review, stats, states, repeating, themes, doctor, help_screen, queue):
         if not only or fn.__name__ in only:
             print("recording", fn.__name__, flush=True)
             fn()

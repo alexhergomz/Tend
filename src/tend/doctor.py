@@ -10,9 +10,8 @@ import sqlite3
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from pathlib import Path
 
-from . import __version__, config, features, hooks, registry
+from . import __version__, config, features, fmt, hooks, registry
 from .store import VERSION
 
 
@@ -27,10 +26,7 @@ class Check:
         return {"level": self.level, "area": self.area, "text": self.text, "fix": self.fix}
 
 
-def _home(path) -> str:
-    p = str(path)
-    home = str(Path.home())
-    return "~" + p[len(home):] if p.startswith(home) else p
+_home = fmt.home
 
 
 def run() -> list[Check]:
@@ -116,7 +112,8 @@ def _backups(out: list[Check], cfg: dict):
     age = datetime.now() - copies[0].made
     level = "warn" if age > timedelta(days=3) and config.data_path().exists() else "ok"
     newest = "today" if age < timedelta(days=1) else f"{age.days} days ago"
-    out.append(Check(level, "backups", f"{len(copies)} copies in {_home(folder)}, newest {newest}"))
+    out.append(Check(level, "backups", f"{fmt.count(len(copies), 'copy', 'copies')} in "
+                                       f"{_home(folder)}, newest {newest}"))
 
 
 def _calendars(out: list[Check], cfg: dict):
@@ -126,11 +123,11 @@ def _calendars(out: list[Check], cfg: dict):
     for source in cfg["calendar"]["ics"]:
         text, warning = ics.fetch(source, config.data_path().parent / "calendars")
         if text is None:
-            out.append(Check("error", "calendar", f"{source}: {warning}", "check the path or address"))
+            out.append(Check("error", "calendar", f"{_home(source)}: {warning}", "check the path or address"))
             continue
         events = ics.parse(text, start, start + timedelta(days=cfg["schedule"]["horizon_days"]))
         level = "warn" if warning else "ok"
-        out.append(Check(level, "calendar", f"{source}: {len(events)} events coming up" +
+        out.append(Check(level, "calendar", f"{_home(source)}: {len(events)} events coming up" +
                          (f" · {warning}" if warning else "")))
 
 

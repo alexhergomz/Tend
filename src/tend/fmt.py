@@ -1,4 +1,5 @@
 from datetime import date
+from pathlib import Path
 
 
 def minutes(m: float) -> str:
@@ -40,5 +41,11 @@ def days(n: float) -> str:
     return f"{n} day" if n == 1 else f"{n} days"
 
 
-def count(n: int, word: str) -> str:
-    return f"{n} {word}" if n == 1 else f"{n} {word}s"
+def count(n: int, word: str, plural: str | None = None) -> str:
+    return f"{n} {word}" if n == 1 else f"{n} {plural or word + 's'}"
+
+
+def home(path) -> str:
+    """A path with your home folder written as ~."""
+    p, root = str(path), str(Path.home())
+    return "~" + p[len(root):] if p == root or p.startswith(root + "/") else p

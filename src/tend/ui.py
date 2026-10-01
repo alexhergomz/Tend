@@ -173,8 +173,8 @@ def queue(ranked: list[Ranked], today: date):
 def help_screen(shown, version: str, config_path, data_path, extensions: bool):
     """All commands by group. `shown(cmd)` says whether a command is available."""
     console.print(Text.assemble((" Tend ", "bold"), (version, DIM),
-                                ("  ·  t <key> or t <name> · t alone opens interactive mode · "
-                                 "t help <command> for details", DIM)))
+                                ("  ·  t <key> or t <name>  ·  t alone: interactive mode  ·  "
+                                 "t help <command>: details", DIM)))
     for group in registry.GROUPS:
         cmds = [c for c in registry.listed() if c.group == group and shown(c)]
         if not cmds:
@@ -201,7 +201,7 @@ def help_screen(shown, version: str, config_path, data_path, extensions: bool):
     if extensions:
         console.print(f"\n   [{DIM}]Plugins: any t-<name> program on your PATH runs as t <name>. "
                       f"t plugins lists them.[/]")
-    console.print(f"\n   [{DIM}]config {escape(str(config_path))}\n   data   {escape(str(data_path))}[/]")
+    console.print(f"\n   [{DIM}]config {escape(fmt.home(config_path))}\n   data   {escape(fmt.home(data_path))}[/]")
 
 
 def command_help(cmd: registry.Command):

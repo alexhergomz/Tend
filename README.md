@@ -5,32 +5,53 @@
   </picture>
 </p>
 
-A task manager for the terminal. It shows one task at a time, tells you why it
-picked that task, and keeps long-term goals from being forgotten.
+<p align="center">
+  <b>One task at a time, and why.</b><br>
+  A calm task manager for the terminal, for people who freeze in front of long lists.
+</p>
+
+<p align="center">
+  <a href="https://github.com/alexhergomz/Tend/actions/workflows/tests.yml"><img alt="tests" src="https://github.com/alexhergomz/Tend/actions/workflows/tests.yml/badge.svg"></a>
+  <a href="https://github.com/alexhergomz/Tend/releases"><img alt="version" src="https://img.shields.io/github/v/tag/alexhergomz/Tend?label=version&color=22b3c6"></a>
+  <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-22b3c6">
+  <a href="LICENSE"><img alt="MIT license" src="https://img.shields.io/badge/license-MIT-22b3c6"></a>
+</p>
+
+<p align="center">
+  <a href="#install">Install</a> ·
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#how-tend-picks-the-next-task">How it picks</a> ·
+  <a href="#commands">Commands</a> ·
+  <a href="docs/data.md">Data reference</a> ·
+  <a href="CHANGELOG.md">Changelog</a>
+</p>
 
 ![Interactive mode: mark done, skip, view the queue](https://raw.githubusercontent.com/alexhergomz/Tend/main/docs/interactive.gif)
 
-**Contents:**
-[Why](#why) ·
-[Install](#install) ·
-[Quick start](#quick-start) ·
-[How Tend picks](#how-tend-picks-the-next-task) ·
-[Task states](#task-states) ·
-[Missed dates](#missed-dates) ·
-[Repeating tasks](#repeating-tasks) ·
-[Focus timer](#focus-timer) ·
-[Weekly review](#weekly-review) ·
-[Planning](#planning-t-plan-and-t-gantt) ·
-[Energy](#energy-windows) ·
-[Reminders](#reminders) ·
-[Learning](#learning-from-your-history) ·
-[Commands](#commands) ·
-[Adding details](#adding-details) ·
-[Settings](#settings) ·
-[Hooks and plugins](#hooks-and-plugins) ·
-[Your data](#your-data) ·
-[Problems](#when-something-is-wrong) ·
-[Stability](#stability)
+## At a glance
+
+<table>
+  <tr>
+    <td width="50%"><img alt="The queue" src="https://raw.githubusercontent.com/alexhergomz/Tend/main/docs/queue.png"><br><b>The queue</b>, with the reason for each place. <code>t ls</code></td>
+    <td width="50%"><img alt="A day plan" src="https://raw.githubusercontent.com/alexhergomz/Tend/main/docs/plan.png"><br><b>A day plan</b> around your calendar, with the same rules. <code>t plan</code></td>
+  </tr>
+  <tr>
+    <td><img alt="A gantt chart" src="https://raw.githubusercontent.com/alexhergomz/Tend/main/docs/gantt.png"><br><b>The next 7 days</b> as a chart. <code>t gantt</code></td>
+    <td><img alt="Learned corrections" src="https://raw.githubusercontent.com/alexhergomz/Tend/main/docs/stats.png"><br><b>Your patterns</b>: how long tasks take, how late you finish. <code>t stats</code></td>
+  </tr>
+</table>
+
+**Contents**
+
+- **Using Tend:** [Why](#why) · [Install](#install) · [Quick start](#quick-start) ·
+  [How Tend picks](#how-tend-picks-the-next-task) · [Task states](#task-states) ·
+  [Missed dates](#missed-dates) · [Repeating tasks](#repeating-tasks) · [Focus timer](#focus-timer) ·
+  [Weekly review](#weekly-review)
+- **Planning:** [Plan and gantt](#planning-t-plan-and-t-gantt) · [Energy windows](#energy-windows) ·
+  [Reminders](#reminders) · [Learning from your history](#learning-from-your-history)
+- **Reference:** [Commands](#commands) · [Adding details](#adding-details) · [Settings](#settings) ·
+  [Hooks and plugins](#hooks-and-plugins) · [Your data](#your-data) ·
+  [When something is wrong](#when-something-is-wrong) · [Stability](#stability)
 
 ## Why
 
@@ -447,6 +468,13 @@ details of one command, and `t <command> --help` does the same.
 In zsh, `?` is a wildcard, so type `t help` on the command line. `t --version`
 shows the version.
 
+<details>
+<summary>What <code>t help</code> looks like</summary>
+
+![The help screen, grouped by topic](https://raw.githubusercontent.com/alexhergomz/Tend/main/docs/help.png)
+
+</details>
+
 ## Adding details
 
 Words become the title. Details set the fields. You can put them anywhere.
@@ -545,6 +573,8 @@ file or hooks folder.
 `theme = "dark"` suits dark terminals and `"light"` suits light ones. `"plain"`
 uses no color and only ASCII characters, for screen readers, logs and simple
 terminals. Tend also follows the `NO_COLOR` environment variable.
+
+![The same screen in the dark, light and plain themes](https://raw.githubusercontent.com/alexhergomz/Tend/main/docs/themes.png)
 
 ### Features
 
@@ -705,14 +735,7 @@ Add `--dry-run` to see the converted data without importing it.
 the database, backups, calendars, hooks, plugins and reminders, and gives a fix
 for each problem. It works even when the settings file is broken.
 
-```
- ✓ tend       Tend 1.0.0 · Python 3.13.7 · linux
- ✗ config     day_start in [schedule] should be a time like 09:00, not '9am'
-              fix: edit ~/.config/tend/config.toml
- ! hooks      on_finish is not an event, so it never runs
-              fix: rename it to one of: on_add, on_done, …
- ✓ data       ~/.local/share/tend/tend.db · 12 open tasks
-```
+![t doctor finds a misnamed hook and says how to fix it](https://raw.githubusercontent.com/alexhergomz/Tend/main/docs/doctor.png)
 
 If your data looks wrong, `t restore` lists the daily copies to go back to.
 
@@ -738,6 +761,9 @@ uv sync
 uv run pytest            # about 160 tests, including old databases and a real terminal
 uv run ruff check src tests
 ```
+
+The same checks run on GitHub for Linux and macOS, with Python 3.11, 3.12 and 3.13,
+on every push.
 
 | Where | What |
 |---|---|
