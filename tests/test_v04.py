@@ -115,16 +115,26 @@ def _run_t(tmp_path, *args, **kw):
     return subprocess.run([sys.executable, "-m", "tend", *args], env=env, capture_output=True, text=True, **kw)
 
 
+def _script(folder, name: str, code: str):
+    """A small Python program that runs as a hook or plugin: `name` on POSIX, `name.py` on Windows."""
+    if sys.platform == "win32":
+        path = folder / f"{name}.py"
+        path.write_text(code)
+    else:
+        path = folder / name
+        path.write_text(f"#!{sys.executable}\n{code}")
+        path.chmod(path.stat().st_mode | stat.S_IEXEC)
+    return path
+
+
 def test_hooks_receive_json(tmp_path):
     hooks = tmp_path / "hooks"
     hooks.mkdir()
     out = tmp_path / "hook.json"
-    script = hooks / "on_done"
-    script.write_text(f"#!/bin/sh\ncat > {out}\n")
-    script.chmod(script.stat().st_mode | stat.S_IEXEC)
+    _script(hooks, "on_done", f"import sys, pathlib\npathlib.Path({str(out)!r}).write_text(sys.stdin.read())\n")
     _run_t(tmp_path, "write", "report")
     _run_t(tmp_path, "done", "1")
-    for _ in range(50):
+    for _ in range(100):
         if out.exists() and out.read_text():
             break
         time.sleep(0.05)
@@ -135,8 +145,6 @@ def test_hooks_receive_json(tmp_path):
 def test_plugins_run_from_path(tmp_path):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
-    plugin = bin_dir / "t-hello"
-    plugin.write_text('#!/bin/sh\necho "hello $1 $TEND_DB"\n')
-    plugin.chmod(plugin.stat().st_mode | stat.S_IEXEC)
-    r = _run_t(tmp_path, "hello", "world", env={"PATH": f"{bin_dir}:{os.environ['PATH']}"})
+    _script(bin_dir, "t-hello", "import os, sys\nprint('hello', sys.argv[1], os.environ['TEND_DB'])\n")
+    r = _run_t(tmp_path, "hello", "world", env={"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}"})
     assert r.stdout.strip() == f"hello world {tmp_path / 't.db'}"

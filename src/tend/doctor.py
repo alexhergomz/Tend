@@ -5,7 +5,6 @@ It doesn't need a working config or database, and it changes nothing.
 
 import os
 import platform
-import shutil
 import sqlite3
 import sys
 from dataclasses import dataclass
@@ -136,14 +135,15 @@ def _hooks(out: list[Check]):
     if not folder.exists():
         return
     for p in sorted(folder.iterdir()):
-        name = p.name[:-2] if p.is_dir() and p.name.endswith(".d") else p.name
+        name = p.name[:-2] if p.is_dir() and p.name.endswith(".d") else (p.stem if hooks.WINDOWS else p.name)
         if name not in hooks.EVENTS:
             out.append(Check("warn", "hooks", f"{p.name} is not an event, so it never runs",
                              f"rename it to one of: {', '.join(hooks.EVENTS)}"))
             continue
         for script in ([p] if p.is_file() else sorted(p.iterdir())):
-            if script.is_file() and not os.access(script, os.X_OK):
-                out.append(Check("warn", "hooks", f"{_home(script)} is not executable", f"chmod +x {script}"))
+            if script.is_file() and not hooks.runnable(script):
+                fix = ("use a .exe, .bat, .cmd or .py file" if hooks.WINDOWS else f"chmod +x {script}")
+                out.append(Check("warn", "hooks", f"{_home(script)} can't be run", fix))
             elif script.is_file():
                 out.append(Check("ok", "hooks", f"{name}: {_home(script)}"))
 
@@ -160,13 +160,11 @@ def _plugins(out: list[Check]):
 def _reminders(out: list[Check]):
     from . import reminders
 
-    sender = shutil.which("notify-send") or (platform.system() == "Darwin" and shutil.which("osascript"))
-    if not sender:
+    if not reminders.can_notify():
         out.append(Check("warn", "reminders", "no notify-send or osascript, so reminders can't be shown",
                          "install libnotify (notify-send); hooks still get every reminder"))
-    timer = reminders.launchd_path() if platform.system() == "Darwin" else \
-        reminders.systemd_dir() / "tend-notify.timer"
-    if timer.exists():
+    timer = reminders.timer()
+    if timer:
         out.append(Check("ok", "reminders", f"timer installed: {_home(timer)}"))
     else:
         out.append(Check("info", "reminders", "no timer installed, so reminders only come when you run t notify",

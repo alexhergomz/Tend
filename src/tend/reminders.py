@@ -79,9 +79,31 @@ def mark_sent(app, reminders: list[Reminder], now: datetime):
     app.store.set_meta(SENT_KEY, json.dumps(sent))
 
 
+WINDOWS = sys.platform == "win32"
+TASK = "Tend reminders"  # the name in Windows Task Scheduler
+BALLOON = (  # a Windows notification, from PowerShell, without extra modules
+    "Add-Type -AssemblyName System.Windows.Forms; $n = New-Object System.Windows.Forms.NotifyIcon; "
+    "$n.Icon = [System.Drawing.SystemIcons]::Information; $n.Visible = $true; "
+    "$n.ShowBalloonTip(10000, '{title}', '{body}', 'None'); Start-Sleep -Seconds 8; $n.Dispose()"
+)
+
+
+def can_notify() -> bool:
+    if WINDOWS:
+        return bool(shutil.which("powershell"))
+    return bool(shutil.which("notify-send") or (platform.system() == "Darwin" and shutil.which("osascript")))
+
+
 def send(title: str, body: str) -> bool:
     """A desktop notification. Returns False if this system has no way to show one."""
     try:
+        if WINDOWS and shutil.which("powershell"):
+            quote = lambda s: s.replace("'", "''")
+            script = BALLOON.format(title=quote(title), body=quote(body))
+            subprocess.Popen(["powershell", "-NoProfile", "-WindowStyle", "Hidden", "-Command", script],
+                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return True
         if shutil.which("notify-send"):
             subprocess.run(["notify-send", "-a", "Tend", title, body], timeout=10, check=False)
             return True
@@ -96,8 +118,28 @@ def send(title: str, body: str) -> bool:
 
 # ── timer ───────────────────────────────────────────────────────────────
 def _command() -> list[str]:
+    if WINDOWS:  # pythonw has no console window, so nothing flashes every 15 minutes
+        windowless = Path(sys.executable).with_name("pythonw.exe")
+        return [str(windowless if windowless.exists() else sys.executable), "-m", "tend", "notify"]
     t = shutil.which("t") or shutil.which("tend")
     return [t, "notify"] if t else [sys.executable, "-m", "tend", "notify"]
+
+
+def timer() -> str | None:
+    """Where the installed timer is, or None."""
+    if WINDOWS:
+        found = subprocess.run(["schtasks", "/Query", "/TN", TASK], capture_output=True).returncode == 0
+        return f"Task Scheduler: {TASK}" if found else None
+    path = launchd_path() if platform.system() == "Darwin" else systemd_dir() / "tend-notify.timer"
+    return str(path) if path.exists() else None
+
+
+def _windows_task(every: int) -> list[str]:
+    run = subprocess.list2cmdline(_command())
+    env = [f'set "{k}={v}"' for k, v in _env().items() if k != "PATH"]
+    if env:  # Task Scheduler can't set variables, so cmd does
+        run = "cmd /c " + " && ".join([*env, run])
+    return ["schtasks", "/Create", "/F", "/SC", "MINUTE", "/MO", str(every), "/TN", TASK, "/TR", run]
 
 
 def _env() -> dict[str, str]:
@@ -141,10 +183,13 @@ def launchd_path() -> Path:
 def install(every: int) -> list[str]:
     """Write and start the timer. Returns what was done, one line each."""
     done = []
+    if WINDOWS:
+        subprocess.run(_windows_task(every), check=True, capture_output=True)
+        return [f"added '{TASK}' to Windows Task Scheduler, every {every} minutes"]
     if platform.system() == "Darwin":
         path = launchd_path()
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(launchd_plist(every))
+        path.write_text(launchd_plist(every), encoding="utf-8")
         done.append(f"wrote {path}")
         subprocess.run(["launchctl", "unload", str(path)], capture_output=True)
         subprocess.run(["launchctl", "load", "-w", str(path)], check=True)
@@ -156,7 +201,7 @@ def install(every: int) -> list[str]:
     folder = systemd_dir()
     folder.mkdir(parents=True, exist_ok=True)
     for name, text in systemd_units(every).items():
-        (folder / name).write_text(text)
+        (folder / name).write_text(text, encoding="utf-8")
         done.append(f"wrote {folder / name}")
     subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
     subprocess.run(["systemctl", "--user", "enable", "--now", "tend-notify.timer"], check=True)
@@ -166,6 +211,10 @@ def install(every: int) -> list[str]:
 
 def uninstall() -> list[str]:
     done = []
+    if WINDOWS:
+        if subprocess.run(["schtasks", "/Delete", "/F", "/TN", TASK], capture_output=True).returncode == 0:
+            done.append(f"removed '{TASK}' from Windows Task Scheduler")
+        return done
     if platform.system() == "Darwin":
         path = launchd_path()
         if path.exists():

@@ -39,7 +39,10 @@ def drive(tmp_path, args, keys, settle=1.5):
 
     pump(settle)
     for delay, key in keys:
-        os.write(fd, key.encode())
+        try:
+            os.write(fd, key.encode())
+        except OSError:  # the program already ended; the screen says why
+            break
         pump(delay)
     pump(0.5)
     _, status = os.waitpid(pid, 0)

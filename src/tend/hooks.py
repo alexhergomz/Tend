@@ -13,6 +13,7 @@ change with before/after rows.
 
 import json
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -37,10 +38,35 @@ def plugin_env() -> dict:
     }
 
 
+WINDOWS = sys.platform == "win32"
+
+
+def runnable(path: Path) -> bool:
+    """POSIX: the executable bit. Windows: a program or script file type."""
+    if not path.is_file():
+        return False
+    if WINDOWS:
+        kinds = os.environ.get("PATHEXT", ".COM;.EXE;.BAT;.CMD").lower().split(";")
+        return path.suffix.lower() in [*kinds, ".py"]
+    return os.access(path, os.X_OK)
+
+
+def command(path) -> list[str]:
+    """How to start a hook or plugin. Windows runs .py files with this Python, .bat and .cmd with cmd."""
+    path = str(path)
+    if WINDOWS and path.lower().endswith(".py"):
+        return [sys.executable, path]
+    if WINDOWS and path.lower().endswith((".bat", ".cmd")):
+        return ["cmd", "/c", path]
+    return [path]
+
+
 def scripts(event: str) -> list[Path]:
     base = hooks_dir()
     found = [base / event, *sorted((base / f"{event}.d").glob("*"))]
-    return [p for p in found if p.is_file() and os.access(p, os.X_OK)]
+    if WINDOWS:  # on_done.py, on_done.bat, ...
+        found += sorted(base.glob(f"{event}.*"))
+    return [p for p in found if runnable(p)]
 
 
 def fire(event: str, payload: dict):
@@ -58,8 +84,8 @@ def fire(event: str, payload: dict):
     with open(log_path, "ab") as log:
         for script in targets:
             try:
-                proc = subprocess.Popen([str(script)], stdin=subprocess.PIPE, stdout=log, stderr=log,
-                                        env=plugin_env(), start_new_session=True)
+                proc = subprocess.Popen(command(script), stdin=subprocess.PIPE, stdout=log, stderr=log,
+                                        env=plugin_env(), start_new_session=not WINDOWS)
                 proc.stdin.write(data)
                 proc.stdin.close()
                 _running.append(proc)
@@ -70,9 +96,15 @@ def fire(event: str, payload: dict):
 def find_plugin(name: str) -> str | None:
     import re
     import shutil
+
     if not re.fullmatch(r"[a-z][a-z0-9_-]*", name):
         return None
-    return shutil.which(f"t-{name}")
+    found = shutil.which(f"t-{name}")
+    if not found and WINDOWS:  # .py files aren't programs on Windows unless .py is in PATHEXT
+        for folder in os.environ.get("PATH", "").split(os.pathsep):
+            if folder and (candidate := Path(folder) / f"t-{name}.py").is_file():
+                return str(candidate)
+    return found
 
 
 def list_plugins() -> list[tuple[str, str]]:
@@ -83,8 +115,8 @@ def list_plugins() -> list[tuple[str, str]]:
         except OSError:
             continue
         for p in entries:
-            name = p.name[2:]
-            if name not in seen and p.is_file() and os.access(p, os.X_OK):
+            name = p.stem[2:] if WINDOWS else p.name[2:]
+            if name not in seen and runnable(p):
                 seen.add(name)
                 out.append((name, str(p)))
     return out

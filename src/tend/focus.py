@@ -5,9 +5,6 @@ flow  counts up with no forced stop; press b for a break sized to the time you w
 box   hard stop after N minutes
 """
 
-import contextlib
-import shutil
-import subprocess
 import time
 from dataclasses import dataclass
 
@@ -29,11 +26,10 @@ class Result:
 
 
 def notify(msg: str):
+    from .reminders import send
+
     console.bell()
-    if shutil.which("notify-send"):
-        with contextlib.suppress(OSError):
-            subprocess.Popen(["notify-send", "-a", "Tend", "Tend", msg],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    send("Tend", msg)
 
 
 def run(title: str, meta: Text, mode: str, cfg: dict, box_min: int | None = None) -> Result:

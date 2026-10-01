@@ -138,20 +138,20 @@ def fetch(source: str, cache_dir: Path) -> tuple[str | None, str | None]:
         path = Path(source).expanduser()
         if not path.exists():
             return None, f"calendar file not found: {source}"
-        return path.read_text(errors="ignore"), None
+        return path.read_text(encoding="utf-8", errors="ignore"), None
     url = "https://" + source[len("webcal://"):] if source.startswith("webcal://") else source
     cache = cache_dir / (hashlib.sha1(url.encode()).hexdigest()[:16] + ".ics")
     if cache.exists() and time.time() - cache.stat().st_mtime < CACHE_TTL:
-        return cache.read_text(errors="ignore"), None
+        return cache.read_text(encoding="utf-8", errors="ignore"), None
     try:
         with urllib.request.urlopen(url, timeout=10) as r:
             text = r.read().decode(errors="ignore")
         cache_dir.mkdir(parents=True, exist_ok=True)
-        cache.write_text(text)
+        cache.write_text(text, encoding="utf-8")
         return text, None
     except OSError as e:
         if cache.exists():
-            return cache.read_text(errors="ignore"), "calendar offline, using the last copy"
+            return cache.read_text(encoding="utf-8", errors="ignore"), "calendar offline, using the last copy"
         return None, f"can't load calendar ({e.__class__.__name__})"
 
 

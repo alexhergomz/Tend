@@ -1,3 +1,4 @@
+import os
 from datetime import date
 from pathlib import Path
 
@@ -48,4 +49,4 @@ def count(n: int, word: str, plural: str | None = None) -> str:
 def home(path) -> str:
     """A path with your home folder written as ~."""
     p, root = str(path), str(Path.home())
-    return "~" + p[len(root):] if p == root or p.startswith(root + "/") else p
+    return "~" + p[len(root):] if p == root or p.startswith(root + os.sep) else p

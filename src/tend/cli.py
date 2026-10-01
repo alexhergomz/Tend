@@ -1,5 +1,6 @@
 """Entry point: `t <command>`, `t <key>`, `t <any text>` to capture, or `t` alone for interactive mode."""
 
+import os
 import sys
 
 from rich.markup import escape
@@ -11,6 +12,13 @@ USAGE_FLAGS = ("-h", "--help")
 
 
 def main(argv: list[str] | None = None):
+    if sys.stdout is None:  # run without a console (pythonw, from the Windows reminder timer)
+        sys.stdout = sys.stderr = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115
+    for stream in (sys.stdout, sys.stderr, sys.stdin):  # pipes carry UTF-8, also on Windows
+        piped = stream is not sys.stdin or (stream and not stream.isatty())
+        if stream and piped and (stream.encoding or "").lower().replace("-", "") != "utf8" \
+                and hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     argv = list(sys.argv[1:] if argv is None else argv)
     json_out = "--json" in argv
     argv = [a for a in argv if a != "--json"]
@@ -38,7 +46,7 @@ def main(argv: list[str] | None = None):
             import subprocess
 
             args = argv[1:] + (["--json"] if json_out else [])
-            sys.exit(subprocess.run([plugin, *args], env=hooks.plugin_env()).returncode)
+            sys.exit(subprocess.run([*hooks.command(plugin), *args], env=hooks.plugin_env()).returncode)
         if fn:
             fn(app, argv[1:])
         else:

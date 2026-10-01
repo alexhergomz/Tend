@@ -1,6 +1,7 @@
 """Config lives in one commented TOML file. Missing keys fall back to DEFAULTS."""
 
 import os
+import sys
 import tomllib
 from datetime import time
 from pathlib import Path
@@ -122,12 +123,24 @@ def _xdg(var: str, fallback: str) -> Path:
     return Path(os.environ.get(var) or Path.home() / fallback)
 
 
+def _windows(var: str, fallback: str) -> Path:
+    return Path(os.environ.get(var) or Path.home() / fallback)
+
+
 def config_path() -> Path:
-    return Path(os.environ.get("TEND_CONFIG") or _xdg("XDG_CONFIG_HOME", ".config") / "tend" / "config.toml")
+    if os.environ.get("TEND_CONFIG"):
+        return Path(os.environ["TEND_CONFIG"])
+    if sys.platform == "win32" and not os.environ.get("XDG_CONFIG_HOME"):
+        return _windows("APPDATA", "AppData/Roaming") / "tend" / "config.toml"
+    return _xdg("XDG_CONFIG_HOME", ".config") / "tend" / "config.toml"
 
 
 def data_path() -> Path:
-    return Path(os.environ.get("TEND_DB") or _xdg("XDG_DATA_HOME", ".local/share") / "tend" / "tend.db")
+    if os.environ.get("TEND_DB"):
+        return Path(os.environ["TEND_DB"])
+    if sys.platform == "win32" and not os.environ.get("XDG_DATA_HOME"):
+        return _windows("LOCALAPPDATA", "AppData/Local") / "tend" / "tend.db"
+    return _xdg("XDG_DATA_HOME", ".local/share") / "tend" / "tend.db"
 
 
 class ConfigError(Exception):
@@ -140,7 +153,7 @@ def read_user() -> dict:
     if not path.exists():
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(TEMPLATE)
+            path.write_text(TEMPLATE, encoding="utf-8")
         except OSError:
             return {}
     try:

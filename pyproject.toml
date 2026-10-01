@@ -14,6 +14,7 @@ classifiers = [
     "Intended Audience :: End Users/Desktop",
     "Operating System :: POSIX :: Linux",
     "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -21,7 +22,7 @@ classifiers = [
     "Topic :: Office/Business :: Scheduling",
     "Topic :: Utilities",
 ]
-dependencies = ["rich>=13", "python-dateutil>=2.8"]
+dependencies = ["rich>=13", "python-dateutil>=2.8", "tzdata; sys_platform == 'win32'"]
 
 [project.urls]
 Homepage = "https://github.com/alexhergomz/Tend"

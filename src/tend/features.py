@@ -41,7 +41,7 @@ def command_enabled(cfg: dict, command: str) -> bool:
 def set_enabled(name: str, on: bool):
     """Write `name = true|false` into [features], keeping comments and everything else."""
     path = config.config_path()
-    lines = path.read_text().splitlines() if path.exists() else []
+    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
     value = "true" if on else "false"
     header = next((i for i, line in enumerate(lines) if re.match(r"\s*\[features\]", line)), None)
     if header is None:
@@ -56,4 +56,4 @@ def set_enabled(name: str, on: bool):
         else:
             lines.insert(header + 1, f"{name} = {value}")
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(lines) + "\n")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")

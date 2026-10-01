@@ -42,7 +42,7 @@ def test_doctor_finds_problems_and_still_runs_with_a_broken_config(tmp_path):
     texts = " ".join(c["text"] for c in checks)
     assert r.returncode == 1
     assert "day_start" in texts and "unknown setting colour" in texts
-    assert "on_finish is not an event" in texts and "not executable" in texts
+    assert "on_finish is not an event" in texts and "can't be run" in texts
 
 
 def test_broken_config_gives_a_clear_message(tmp_path):

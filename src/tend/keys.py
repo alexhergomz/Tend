@@ -1,11 +1,18 @@
-"""Single-keypress input. Falls back to line input when stdin isn't a terminal."""
+"""Single-keypress input, on POSIX terminals and on Windows. Falls back to line input without a terminal."""
 
-import os
-import select
 import sys
-import termios
-import tty
+import time
 from contextlib import contextmanager
+
+WINDOWS = sys.platform == "win32"
+
+if WINDOWS:
+    import msvcrt
+else:
+    import os
+    import select
+    import termios
+    import tty
 
 
 def interactive() -> bool:
@@ -14,7 +21,8 @@ def interactive() -> bool:
 
 @contextmanager
 def raw():
-    if not sys.stdin.isatty():
+    """Keys arrive one at a time, without Enter. Nothing to set up on Windows."""
+    if WINDOWS or not sys.stdin.isatty():
         yield
         return
     fd = sys.stdin.fileno()
@@ -26,18 +34,34 @@ def raw():
         termios.tcsetattr(fd, termios.TCSADRAIN, old)
 
 
+def _name(s: str) -> str | None:
+    if s.startswith("\x1b"):
+        return "esc" if s == "\x1b" else None  # arrow keys and the like are ignored
+    if s in ("\r", "\n"):
+        return "enter"
+    if s == "\x03":
+        raise KeyboardInterrupt
+    return s[:1] or None
+
+
 def getkey(timeout: float | None = None) -> str | None:
     """Read one key while in raw(). Returns None on timeout."""
+    if WINDOWS:
+        end = None if timeout is None else time.monotonic() + timeout
+        while not msvcrt.kbhit():
+            if end is not None and time.monotonic() >= end:
+                return None
+            time.sleep(0.02)
+        ch = msvcrt.getwch()
+        if ch in ("\x00", "\xe0"):  # a function or arrow key: two characters, ignored
+            msvcrt.getwch()
+            return None
+        return _name(ch)
     fd = sys.stdin.fileno()
     ready, _, _ = select.select([fd], [], [], timeout)
     if not ready:
         return None
-    s = os.read(fd, 16).decode(errors="ignore")
-    if s.startswith("\x1b"):
-        return "esc" if s == "\x1b" else None  # ignore arrow keys etc.
-    if s in ("\r", "\n"):
-        return "enter"
-    return s[:1] or None
+    return _name(os.read(fd, 16).decode(errors="ignore"))
 
 
 def readkey() -> str:
