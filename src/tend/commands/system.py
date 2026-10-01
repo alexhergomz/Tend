@@ -54,6 +54,7 @@ def cmd_restore(app: App, args):
         before = backup.restore(app.store.db, app.cfg, chosen.path)
     except ValueError as e:
         raise UsageError(str(e)) from None
+    app.store.migrate()  # a copy made by an older version
     app.store.changed()
     app.store.mark("restore", f"restored the copy from {chosen.made:%Y-%m-%d %H:%M}")
     if app.json:
@@ -71,8 +72,11 @@ def cmd_export(app: App, args):
         transfer.export(app.store, sys.stdout)
         return
     path = Path(files[0]).expanduser()
-    with path.open("w", encoding="utf-8") as f:
-        counts = transfer.export(app.store, f)
+    try:
+        with path.open("w", encoding="utf-8") as f:
+            counts = transfer.export(app.store, f)
+    except OSError as e:
+        raise UsageError(f"can't write {files[0]}: {e.strerror}") from None
     if app.json:
         return app.emit({"path": str(path), **counts})
     app.say(f" [{ACCENT}]✓[/] exported {fmt.count(counts['tasks'], 'task')}, {fmt.count(counts['goals'], 'goal')}, "

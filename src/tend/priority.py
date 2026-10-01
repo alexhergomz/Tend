@@ -7,8 +7,9 @@ Rule 2 (Big Rocks / Eat the Frog): until you've worked on a goal today, the
 Rule 3 (WSJF): everything else by (value + urgency) / size. Ties go to started
     tasks, then to the oldest.
 
-Waiting tasks leave the queue, unless their deadline is at risk. Tasks skipped
-today go to the end. During a high or low energy window, tasks
+Waiting and hidden (after:) tasks leave the queue, unless their deadline is at
+risk. A step of a split task has the deadline of the task it came from, if that
+is earlier than its own. Tasks skipped today go to the end. During a high or low energy window, tasks
 tagged with the other energy level go after the rest (deadlines at risk still
 come first).
 
@@ -34,10 +35,12 @@ class Ranked:
     urgency: int
     slack: float | None  # days, from the hard deadline
     reason: str
+    deadline: date | None = None  # its own due date, or the earliest one of the tasks it was split from
 
     def to_json(self) -> dict:
         return {
             **self.task.to_json(),
+            "deadline": self.deadline,
             "rule": self.rule,
             "score": round(self.score, 2),
             "urgency": self.urgency,
@@ -62,6 +65,19 @@ def urgency(slack: float | None) -> int:
     return 2 if slack >= 2 else 3
 
 
+def deadline(t: Task, by_id: dict[int, Task]) -> tuple[date | None, Task | None]:
+    """The hard deadline that applies: the task's own, or an earlier one of a task it was split from.
+    Returns (date, the task it comes from if not this one)."""
+    best, source, seen = t.due, None, {t.id}
+    parent = by_id.get(t.parent)
+    while parent and parent.id not in seen:
+        seen.add(parent.id)
+        if parent.due and (best is None or parent.due < best):
+            best, source = parent.due, parent
+        parent = by_id.get(parent.parent)
+    return best, source
+
+
 def rank(
     tasks: list[Task],
     *,
@@ -77,43 +93,52 @@ def rank(
     hard_shift: int = 0,  # days: treat deadlines as this much earlier
     soft_shift: int = 0,  # days: treat soft targets as this much earlier
     energy_now: str | None = None,  # "high" / "low" window, or None
+    by_id: dict[int, Task] | None = None,  # all open tasks, if `tasks` is only some of them
 ) -> list[Ranked]:
     goal_targets = goal_targets or {}
     goal_minutes = goal_minutes or {}
     logged = logged or {}
 
+    by_id = by_id or {t.id: t for t in tasks}
     scored: list[Ranked] = []
     for t in tasks:
-        if t.status != "open" or t.id in blocked or (t.start_after and t.start_after > today):
+        if t.status != "open" or t.id in blocked:
             continue
         work = work_left_hours(t, logged.get(t.id, 0), calibration)
-        due = t.due - timedelta(days=hard_shift) if t.due else None
+        hard, source = deadline(t, by_id)
+        due = hard - timedelta(days=hard_shift) if hard else None
         aim = t.aim - timedelta(days=soft_shift) if t.aim else None
         due_slack = slack_days(due, work, today, hours_per_day) if due else None
         aim_slack = slack_days(aim, work, today, hours_per_day) if aim else None
+        at_risk = due_slack is not None and due_slack <= at_risk_days
+        # hidden until a date, or waiting: out of the queue, unless a deadline is at risk
+        hidden = t.start_after and t.start_after > today
+        if not at_risk and (hidden or (t.stage == "waiting" and not t.start_after)):
+            continue
         slacks = [s for s in (due_slack, aim_slack) if s is not None]
         u = urgency(min(slacks) if slacks else None)
         v, size = t.value or DEFAULT_VALUE, t.size or DEFAULT_SIZE
         score = (v + u) / SIZES[size]
-        at_risk = due_slack is not None and due_slack <= at_risk_days
-        if t.stage == "waiting" and not t.start_after and not at_risk:
-            continue  # waiting leaves the queue, unless its deadline is at risk
         if at_risk:
-            if t.due < today:
+            if hard < today:
                 reason = f"past due · ~{fmt.hours(work)} of work left"
             else:
                 reason = f"at risk · ~{fmt.hours(work)} of work, {max(due_slack, 0):.1f} days of slack"
                 if hard_shift:
                     reason += f" (with a {hard_shift} day margin)"
+            if source:
+                reason += f" · deadline of #{source.id} {source.title}"
             if t.stage == "waiting":
                 reason += " · marked waiting"
+            elif hidden:
+                reason += f" · was hidden until {fmt.day(t.start_after, today)}"
             rule = 1
         else:
             reason = f"(value {v} + urgency {u}) / size {SIZES[size]} = {score:.1f}"
             if not t.triaged:
                 reason += " · untriaged, using defaults"
             rule = 3
-        scored.append(Ranked(t, rule, score, u, due_slack, reason))
+        scored.append(Ranked(t, rule, score, u, due_slack, reason, hard))
 
     skipped = [r for r in scored if r.task.skip_date == today]
     active = [r for r in scored if r.task.skip_date != today]

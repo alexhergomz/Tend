@@ -10,7 +10,7 @@ from ..model import Task
 from ..registry import command
 from ..ui import ACCENT, ACCENT_B, DIM, WARN, console
 from . import actions
-from ._shared import title
+from ._shared import fresh, title
 from .capture import cmd_triage
 from .looking import corrections_table
 
@@ -43,6 +43,8 @@ def cmd_resolve(app: App, args):
     for key, name, what in CHOICES:
         console.print(f"   [{ACCENT_B}]{key}[/]  {name:<12}[{DIM}]{what}[/]")
     for t in todo:
+        if not (t := fresh(app, t)):
+            continue
         hard = bool(t.due and t.due < app.today)
         console.print(f"\n {title(t)}  [{WARN}]{slips.why(t, app.today)}[/]")
         repeating = bool(t.repeat and app.on("repeat"))
@@ -136,6 +138,8 @@ def _review(app: App, since) -> bool:
     if not waiting:
         console.print(f"   [{DIM}]No task is waiting without a date.[/]")
     for t in waiting:
+        if not (t := fresh(app, t)):
+            continue
         console.print(f"   {title(t)} [{DIM}]waiting, no date[/]")
         k = ui.choose("  ", {"enter": "still waiting", "b": "back to the queue", "d": "done", "k": "drop", "q": "stop"})
         if k == "q":
@@ -156,6 +160,8 @@ def _review(app: App, since) -> bool:
     if not old:
         console.print(f"   [{DIM}]Nothing older than 30 days without a date.[/]")
     for t in old:
+        if not (t := fresh(app, t)):
+            continue
         console.print(f"   {title(t)} [{DIM}]added {t.created[:10]}[/]")
         k = ui.choose("  ", {"enter": "keep", "a": "set a date", "k": "drop", "q": "stop"})
         if k == "q":

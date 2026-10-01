@@ -108,9 +108,11 @@ def add(store: Store, data: dict) -> dict[str, int]:
             new_id[t["id"]] = _insert(store, "tasks", {**t, "parent": None}, task_cols, keep_id=False)
             counts["tasks"] += 1
         for t in data["tasks"]:  # links between tasks, now that every task has its new id
-            parent = new_id.get(t.get("parent")) or same.get(t.get("parent"))
-            if t["id"] in new_id and parent:
-                store.db.execute("UPDATE tasks SET parent = ? WHERE id = ?", (parent, new_id[t["id"]]))
+            if t["id"] not in new_id:
+                continue
+            for link in ("parent", "series"):
+                target = new_id.get(t.get(link)) or same.get(t.get(link))
+                store.db.execute(f"UPDATE tasks SET {link} = ? WHERE id = ?", (target, new_id[t["id"]]))
         session_cols = columns(store, "sessions")
         for s in data["sessions"]:
             if s.get("task_id") in new_id:

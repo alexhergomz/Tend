@@ -17,7 +17,7 @@ from rich.rule import Rule
 from rich.text import Text
 
 from . import fmt, keys
-from .ui import ACCENT, DIM, WARN, console
+from .ui import ACCENT, ACCENT_B, DIM, WARN, console
 
 BAR = 32
 
@@ -50,7 +50,7 @@ def run(title: str, meta: Text, mode: str, cfg: dict, box_min: int | None = None
         label, color = {"work": ("Focus", ACCENT), "break": ("Break", WARN), "between": ("Paused", DIM)}[phase]
         if paused:
             label, color = "Paused", DIM
-        head = Text.assemble((" ● ", color), (f"{label}  ", f"bold {color}"), (title, "bold"), "  ", meta)
+        head = Text.assemble((" ● ", color), (f"{label}  ", f"{color}.bold"), (title, "bold"), "  ", meta)
         if phase == "between":
             body = Text("   " + message, style=DIM)
         elif target:
@@ -59,7 +59,7 @@ def run(title: str, meta: Text, mode: str, cfg: dict, box_min: int | None = None
             body = Text.assemble("   ", ("━" * filled, color), ("━" * (BAR - filled), DIM),
                                  f"  {fmt.clock(target - elapsed)}", (" left", DIM))
         else:
-            body = Text.assemble("   ", (fmt.clock(elapsed), f"bold {color}"), (" elapsed", DIM),
+            body = Text.assemble("   ", (fmt.clock(elapsed), f"{color}.bold"), (" elapsed", DIM),
                                  (f" · break earned {fmt.minutes(earned_break() / 60)}", DIM))
         extra = Text(f"   {mode} · round {rounds} · {fmt.minutes(worked / 60)} focused", style=DIM)
         opts = {"work": ["p pause", "d done", "q stop"] + (["b break"] if mode == "flow" else []),
@@ -68,7 +68,7 @@ def run(title: str, meta: Text, mode: str, cfg: dict, box_min: int | None = None
         bar = Text(" ")
         for o in opts:
             k, name = o.split(" ", 1)
-            bar.append(k, f"bold {ACCENT}")
+            bar.append(k, ACCENT_B)
             bar.append(f" {name}   ", DIM)
         return Group(head, body, extra, Rule(style=DIM), bar)
 

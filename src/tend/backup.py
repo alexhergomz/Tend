@@ -99,8 +99,12 @@ def restore(db: sqlite3.Connection, cfg: dict, path: Path) -> Path:
     """Replace the current data with a copy. Saves the current data first and returns that copy."""
     if not check(path):
         raise ValueError(f"{path.name} is damaged or not a Tend database")
-    before = make(db, cfg, "before")
+    # read the copy first: saving the current data can prune old copies, maybe this one
     src = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-    src.backup(db)
+    held = sqlite3.connect(":memory:")
+    src.backup(held)
     src.close()
+    before = make(db, cfg, "before")
+    held.backup(db)
+    held.close()
     return before

@@ -1,14 +1,36 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/logo/tend-dark.svg">
-    <img alt="Tend" src="docs/logo/tend-light.svg" width="280">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/alexhergomz/Tend/main/docs/logo/tend-dark.svg">
+    <img alt="Tend" src="https://raw.githubusercontent.com/alexhergomz/Tend/main/docs/logo/tend-light.svg" width="280">
   </picture>
 </p>
 
 A task manager for the terminal. It shows one task at a time, tells you why it
 picked that task, and keeps long-term goals from being forgotten.
 
-![Interactive mode: mark done, skip, view the queue](docs/interactive.gif)
+![Interactive mode: mark done, skip, view the queue](https://raw.githubusercontent.com/alexhergomz/Tend/main/docs/interactive.gif)
+
+**Contents:**
+[Why](#why) ·
+[Install](#install) ·
+[Quick start](#quick-start) ·
+[How Tend picks](#how-tend-picks-the-next-task) ·
+[Task states](#task-states) ·
+[Missed dates](#missed-dates) ·
+[Repeating tasks](#repeating-tasks) ·
+[Focus timer](#focus-timer) ·
+[Weekly review](#weekly-review) ·
+[Planning](#planning-t-plan-and-t-gantt) ·
+[Energy](#energy-windows) ·
+[Reminders](#reminders) ·
+[Learning](#learning-from-your-history) ·
+[Commands](#commands) ·
+[Adding details](#adding-details) ·
+[Settings](#settings) ·
+[Hooks and plugins](#hooks-and-plugins) ·
+[Your data](#your-data) ·
+[Problems](#when-something-is-wrong) ·
+[Stability](#stability)
 
 ## Why
 
@@ -30,21 +52,36 @@ Other design choices:
 - `t plan` builds a schedule around your calendar with the same rules.
 - Tend learns from your history: how long tasks really take, and how late you
   usually finish compared to your dates. It corrects for both.
-- Energy windows keep hard tasks in the hours when you think best.
-- Hooks and plugins let you add anything else, in any language.
+- Everything beyond the core can be [turned off](#features).
 - Your data is a plain SQLite file. Every command can print JSON.
 
 ## Install
 
-You need Python 3.11 or newer. The only dependencies are `rich` and `python-dateutil`.
+You need Python 3.11 or newer, on Linux or macOS.
 
 ```sh
-git clone https://github.com/alexhergomz/Tend.git tend
-cd tend
-uv tool install --editable .     # or: pipx install --editable .
+pipx install tend-cli          # or: uv tool install tend-cli
 ```
 
-This installs two commands, `t` and `tend`, which are the same program.
+This installs two commands, `t` and `tend`, which are the same program. To
+install from source instead:
+
+```sh
+git clone https://github.com/alexhergomz/Tend.git
+uv tool install ./Tend         # add --editable to work on the code
+```
+
+**Shell completion** completes commands, task numbers with their titles, goals,
+dates and details:
+
+```sh
+eval "$(t completion bash)"                       # in ~/.bashrc
+source <(t completion zsh)                        # in ~/.zshrc, after compinit
+t completion fish > ~/.config/fish/completions/t.fish
+```
+
+**Man page:** `man ./docs/t.1` from the source folder, or copy `docs/t.1` to
+`~/.local/share/man/man1/`.
 
 ## Quick start
 
@@ -56,13 +93,13 @@ t next                                      # show the one task to do now
 t                                           # interactive mode
 ```
 
-![Adding tasks and asking for the next one](docs/capture.gif)
+![Adding tasks and asking for the next one](https://raw.githubusercontent.com/alexhergomz/Tend/main/docs/capture.gif)
 
 New tasks without details go to the **inbox**. They are still in the queue, with
 default values. Run `t triage` to sort them. It asks three questions per task,
 and each one takes a single keypress.
 
-![Triage: three questions per task](docs/triage.gif)
+![Triage: three questions per task](https://raw.githubusercontent.com/alexhergomz/Tend/main/docs/triage.gif)
 
 ## How Tend picks the next task
 
@@ -96,12 +133,12 @@ priority = (value + urgency) / size
 | **urgency** (computed from slack) | more than 7 days, or no date | 2 to 7 days | less than 2 days |
 | **size** (you set it) | S, under 1 hour | M, 1 to 3 hours | L, over 3 hours |
 
-If two tasks have the same score, the older task wins. Tasks you skipped today
-go to the end of the queue.
+If two tasks have the same score, a started task wins, then the older one. Tasks
+you skipped today go to the end of the queue.
 
-`t ls` shows the full queue and the rule or arithmetic behind each position:
+`t ls` shows the queue and the rule or arithmetic behind each position:
 
-![The queue with the reason for each position](docs/queue.png)
+![The queue with the reason for each position](https://raw.githubusercontent.com/alexhergomz/Tend/main/docs/queue.png)
 
 There are no hidden weights to tune. The only settings are the focus hours per
 day (default 4) and the slack limit for rule 1 (default 1 day).
@@ -124,13 +161,11 @@ todo ──► started ──► done
 | `done` | Finished. | `t done 4` (key `d`) |
 | `dropped` | You decided not to do it. | `t drop 4` (key `k`) |
 
-`t status <id> <state>` sets any state. Without an id, the commands act on the
-task that `t next` showed.
+Without a number, a command acts on the task that `t next` showed last.
 
-**Started tasks win ties.** When two tasks have the same score, the started one
-comes first. Finishing work in progress before starting more is a core idea of
-Kanban (a "WIP limit"). If more than 3 tasks are started at once, the status
-line shows a warning. Change the limit with `max_started` in the config.
+**Started tasks win ties.** Finishing work in progress before starting more is a
+core idea of Kanban (a "WIP limit"). If more than 3 tasks are started at once,
+the status line shows a warning. Change the limit with `max_started`.
 
 **Waiting tasks leave the queue,** so `t next` and `t plan` skip them. They are
 not forgotten:
@@ -143,7 +178,7 @@ not forgotten:
 
 Splitting a task and starting one of its steps also starts the original task.
 
-![Starting a task, putting one on hold, and the queue](docs/states.gif)
+![Starting a task, putting one on hold, and the queue](https://raw.githubusercontent.com/alexhergomz/Tend/main/docs/states.gif)
 
 ## Missed dates
 
@@ -161,8 +196,6 @@ A task **slips** when its date passes and the task is not done.
 Tend never hides these tasks. The status line under every command shows how many
 need a decision, for example `2 slipped`. The count stays until you decide.
 
-### Deciding: `t resolve`
-
 `t resolve` (key `r`) shows the slipped tasks one at a time. For each task, you
 press one key:
 
@@ -177,11 +210,7 @@ press one key:
 After `n`, `r` or `x`, the slip count starts again at zero, so a missed soft
 target gets two quiet rollovers again.
 
-Example: "reply to professor" missed its hard deadline, so it gets a new one
-(`r`, then `fri`). "fix bike" missed its soft target three times, so it gets
-dropped (`k`).
-
-![Resolving slipped tasks](docs/resolve.gif)
+![Resolving slipped tasks](https://raw.githubusercontent.com/alexhergomz/Tend/main/docs/resolve.gif)
 
 ## Repeating tasks
 
@@ -214,48 +243,11 @@ date and today:
   repeats never pile up.
 - Finish Thursday's task on Wednesday, and it counts as Thursday's.
 
-To skip one time, `t drop` asks "skip just this one, or stop repeating?". Use
-`t drop 4 --once` or `--stop` to answer in advance. In `t resolve`, the drop
-choice skips just this one. To stop a series, use `t edit 4 every:none`.
+`t drop` asks "skip just this one, or stop repeating?". Use `t drop 4 --once` or
+`--stop` to answer in advance. In `t resolve`, the drop choice skips just this
+one. `t edit 4 every:none` stops a series.
 
-Every copy has the id of the first task in `series`, so a plugin can follow a
-habit over time.
-
-![A repeating task: finish one, the next one appears](docs/repeat.gif)
-
-## Reminders
-
-`t notify` checks once and sends a desktop notification for anything new:
-
-- **Today starts with:** the first task of the day, once a day, after `day_start`.
-- **Deadline at risk:** when a hard deadline becomes at risk (rule 1).
-- **Missed deadline:** when a hard deadline passes.
-- **Back from waiting:** when a waiting task comes back on its date.
-
-Each reminder is sent once. Outside your working day (`day_start` to `day_end`)
-nothing is sent, and reminders wait until the day starts.
-
-Tend never runs in the background by itself. To check every 15 minutes, install
-a timer:
-
-```sh
-t notify --install     # systemd user timer on Linux, launchd agent on macOS
-t notify --test        # send a test reminder
-t notify --dry-run     # show what would be sent, without sending
-t notify --uninstall
-```
-
-Without systemd or launchd, run `t notify` from cron.
-
-To get reminders on your phone, write an `on_remind` hook. It receives each
-reminder as JSON, and can forward it, for example to [ntfy](https://ntfy.sh):
-
-```sh
-#!/bin/sh
-# ~/.config/tend/hooks/on_remind
-python3 -c 'import json,sys; e=json.load(sys.stdin); print(e["title"] + ": " + e["body"])' \
-  | curl -s -d @- ntfy.sh/your-private-topic > /dev/null
-```
+![A repeating task: finish one, the next one appears](https://raw.githubusercontent.com/alexhergomz/Tend/main/docs/repeat.gif)
 
 ## Focus timer
 
@@ -267,110 +259,12 @@ python3 -c 'import json,sys; e=json.load(sys.stdin); print(e["title"] + ": " + e
 | Flow | `--flow` | Counts up with no forced stop. Press `b` to take a break. The break length is 20% of the time you worked. |
 | Timebox | `--box 45` | Stops after the given number of minutes |
 
-The timer sends a desktop notification when a phase ends (`notify-send` on Linux).
-Time is saved per task and counts toward goal progress.
+The timer sends a desktop notification when a phase ends. Time is saved per task
+and counts toward goal progress.
 
-![Pomodoro with a short test config, played at 4x speed](docs/focus.gif)
+![Pomodoro with a short test config, played at 4x speed](https://raw.githubusercontent.com/alexhergomz/Tend/main/docs/focus.gif)
 
 *The GIF uses a 1 minute pomodoro and plays at 4x speed.*
-
-## Planning: `t plan` and `t gantt`
-
-`t plan` shows a schedule for today. If the working day is already over, it
-shows tomorrow.
-
-![A day plan built around a calendar event](docs/plan.png)
-
-The plan does not use a separate algorithm. For each free time slot, it asks the
-same question as `t next`: "which task comes first at this point?" It books a
-block for that task and repeats. So the plan and `t next` always agree.
-
-- **Free time** is the working window (09:00 to 18:00 by default) minus your
-  calendar events.
-- **Focus per day** is limited to `hours_per_day` (4 by default). The rest of
-  the window stays free, as a buffer for things that come up.
-- **Blocks** are at most 90 minutes, with a 10 minute gap between them.
-- **Warnings** appear when a deadline won't be met, with the amount of work
-  that doesn't fit.
-- **Nothing is saved.** The plan is rebuilt every time you run it, so it is
-  never out of date. If your day goes wrong, run `t plan` again.
-
-`t gantt` (key `c`) shows the next 7 days as a chart. Each row is a task and each
-line is the focus time for that day. `◆` marks a deadline. Use `--days 14` for a
-longer view.
-
-![The next 7 days as a gantt chart](docs/gantt.png)
-
-To export the plan to your own calendar app, run `t plan --ics > plan.ics`.
-
-### Calendar
-
-Tend reads busy times from `.ics` files or URLs. Most calendar apps can give
-you one. In Google Calendar, open *Settings and sharing* for your calendar, then
-copy *Secret address in iCal format*. Add it to the config:
-
-```toml
-[calendar]
-ics = ["~/calendars/uni.ics", "https://calendar.google.com/calendar/ical/.../basic.ics"]
-```
-
-Tend supports repeating events, time zones, deleted and moved repeats, and
-events marked as "free". All-day events don't block any hours. URLs are cached
-for 15 minutes. If you are offline, Tend uses the last copy.
-
-## Learning from your history
-
-Most people underestimate how long tasks take, and finish later than the date
-they set. Tend measures both, and corrects for them without asking you to
-change how you estimate. Run `t stats` (key `i`) to see the numbers.
-
-![How your plans usually go](docs/stats.png)
-
-All corrections use the same simple model:
-
-- The **median** of your last 20 finished tasks. A few extreme tasks don't move it.
-- Nothing changes until there are **5 tasks** of that kind.
-- The correction has **limits**, so bad data can't make it extreme.
-
-| What | Measured as | Correction | Limits |
-|---|---|---|---|
-| **Time** | focus time ÷ estimate, for tasks with timer sessions | Estimates are multiplied by it. It affects slack and plans. | ×0.5 to ×3 |
-| **Soft dates** | days between the *first* soft target and the day the task was done | Soft targets count as that many days earlier, so they get urgent sooner. | 0 to 7 days |
-| **Deadlines** | the same, for the *first* hard deadline | Rule 1 warns that many days earlier. | 0 to 7 days |
-| **Push-backs** | how many times a task's date moved to a later day | None. Shown only. | – |
-| **Start to done** | days from `started` to `done` | None. Shown only. | – |
-
-The date corrections use the first date a task had. If you move a date, the
-original still counts, so moving dates doesn't hide lateness. Finishing early
-never moves your dates later.
-
-Push-backs and start-to-done time have no correction, because there is no
-simple model that uses them reliably. The data is there for plugins: `tasks.pushes`, `tasks.first_due`,
-`tasks.first_aim`, the full history in `events`, and `t stats --json`. After a
-task is pushed twice, its line shows `pushed 2×`.
-
-To turn off all corrections, set `calibrate = false`.
-
-## Energy windows
-
-Some tasks need a clear head, and some don't. Tell Tend when your good hours are:
-
-```toml
-[energy]
-high = ["09:00-12:00"]
-low = ["14:00-16:00", "20:00-22:00"]
-```
-
-Then tag tasks with `@high` (hard work) or `@low` (easy work). Untagged tasks
-fit anywhere.
-
-- **`t plan`** only books `@high` tasks inside high windows. In a high window,
-  it books `@low` tasks only if nothing else fits.
-- **`t next`** puts `@high` tasks after the others during a low window, and
-  `@low` tasks after the others during a high window. The reason line says so.
-- **Tired right now?** `t next --low` treats the current time as a low window.
-  `--high` does the opposite.
-- **Deadlines win.** A task whose deadline is at risk (rule 1) ignores energy.
 
 ## Weekly review
 
@@ -390,56 +284,174 @@ It takes about five minutes and has seven steps:
 
 Press `q` at any question to stop.
 
-![The weekly review](docs/review.gif)
+![The weekly review](https://raw.githubusercontent.com/alexhergomz/Tend/main/docs/review.gif)
+
+## Planning: `t plan` and `t gantt`
+
+`t plan` (key `p`) shows a schedule for today. If the working day is over, it
+shows tomorrow.
+
+![A day plan built around a calendar event](https://raw.githubusercontent.com/alexhergomz/Tend/main/docs/plan.png)
+
+The plan does not use a separate algorithm. For each free time slot, it asks the
+same question as `t next`: "which task comes first at this point?" It books a
+block for that task and repeats. So the plan and `t next` always agree.
+
+- **Free time** is the working window (09:00 to 18:00 by default) minus your
+  calendar events.
+- **Focus per day** is limited to `hours_per_day` (4 by default). The rest of
+  the window stays free, as a buffer for things that come up.
+- **Blocks** are at most 90 minutes, with a 10 minute gap between them.
+- **Warnings** appear when a deadline won't be met, with the amount of work
+  that doesn't fit.
+- **Nothing is saved.** The plan is rebuilt every time you run it, so it is
+  never out of date. If your day goes wrong, run `t plan` again.
+
+`t gantt` (key `c`) shows the next 7 days as a chart. Each row is a task and each
+bar is the focus time for that day. `◆` marks a deadline. Use `--days 14` for a
+longer view. `t plan --ics > plan.ics` exports the plan to your calendar app.
+
+![The next 7 days as a gantt chart](https://raw.githubusercontent.com/alexhergomz/Tend/main/docs/gantt.png)
+
+**Calendar.** Tend reads busy times from `.ics` files or URLs. In Google
+Calendar, open *Settings and sharing* for your calendar, then copy *Secret
+address in iCal format*. Add it to the settings:
+
+```toml
+[calendar]
+ics = ["~/calendars/uni.ics", "https://calendar.google.com/calendar/ical/.../basic.ics"]
+```
+
+Tend supports repeating events, time zones, deleted and moved repeats, and
+events marked as "free". All-day events don't block any hours. URLs are cached
+for 15 minutes. If you are offline, Tend uses the last copy.
+
+## Energy windows
+
+Some tasks need a clear head, and some don't. Tell Tend when your good hours are:
+
+```toml
+[energy]
+high = ["09:00-12:00"]
+low = ["14:00-16:00", "20:00-22:00"]
+```
+
+Then tag tasks with `@high` (hard work) or `@low` (easy work). Untagged tasks
+fit anywhere.
+
+- **`t plan`** only books `@high` tasks inside high windows. In a high window,
+  it books `@low` tasks only if nothing else fits.
+- **`t next`** puts `@high` tasks after the others during a low window, and
+  `@low` tasks after the others during a high window. The reason line says so.
+- **Tired right now?** `t next --low` treats the current time as a low window.
+- **Deadlines win.** A task whose deadline is at risk ignores energy.
+
+## Reminders
+
+`t notify` checks once and sends a desktop notification for anything new:
+
+- **Today starts with:** the first task of the day, once a day, after `day_start`.
+- **Deadline at risk:** when a hard deadline becomes at risk (rule 1).
+- **Missed deadline:** when a hard deadline passes.
+- **Back from waiting:** when a waiting task comes back on its date.
+
+Each reminder is sent once. Outside your working day nothing is sent, and
+reminders wait until the day starts. Tend never runs in the background by
+itself. To check every 15 minutes, install a timer:
+
+```sh
+t notify --install     # systemd user timer on Linux, launchd agent on macOS
+t notify --test        # send a test reminder
+t notify --dry-run     # show what would be sent, without sending
+t notify --uninstall
+```
+
+Without systemd or launchd, run `t notify` from cron. To get reminders on your
+phone, write an `on_remind` [hook](#hooks). For example, with [ntfy](https://ntfy.sh):
+
+```sh
+#!/bin/sh
+# ~/.config/tend/hooks/on_remind
+python3 -c 'import json,sys; e=json.load(sys.stdin); print(e["title"] + ": " + e["body"])' \
+  | curl -s -d @- ntfy.sh/your-private-topic > /dev/null
+```
+
+## Learning from your history
+
+Most people underestimate how long tasks take, and finish later than the date
+they set. Tend measures both, and corrects for them without asking you to
+change how you estimate. Run `t stats` (key `i`) to see the numbers.
+
+![How your plans usually go](https://raw.githubusercontent.com/alexhergomz/Tend/main/docs/stats.png)
+
+All corrections use the same simple model:
+
+- The **median** of your last 20 finished tasks. A few extreme tasks don't move it.
+- Nothing changes until there are **5 tasks** of that kind.
+- The correction has **limits**, so bad data can't make it extreme.
+
+| What | Measured as | Correction | Limits |
+|---|---|---|---|
+| **Time** | focus time ÷ estimate, for tasks with timer sessions | Estimates are multiplied by it. It affects slack and plans. | ×0.5 to ×3 |
+| **Soft dates** | days between the *first* soft target and the day the task was done | Soft targets count as that many days earlier, so they get urgent sooner. | 0 to 7 days |
+| **Deadlines** | the same, for the *first* hard deadline | Rule 1 warns that many days earlier. | 0 to 7 days |
+| **Push-backs** | how many times a task's date moved to a later day | None. Shown only. | – |
+| **Start to done** | days from `started` to `done` | None. Shown only. | – |
+
+The date corrections use the first date a task had, so moving a date doesn't
+hide lateness. Finishing early never moves your dates later. Push-backs and
+start-to-done time have no correction, because no simple model uses them
+reliably. The data is there for plugins. To turn off all corrections, set
+`calibrate = false` or turn off the `learning` feature.
 
 ## Commands
 
-Each command has a one-letter key. `t d` is the same as `t done`. In interactive
-mode (`t` with no arguments), you only press the letter.
+Each command has a one-letter key: `t d` is the same as `t done`. In interactive
+mode (`t` alone), you only press the letter. `t help <command>` shows the
+details of one command, and `t <command> --help` does the same.
 
 | Key | Command | What it does |
 |---|---|---|
-| `n` | `next` | Show the one task to do now (`--low`, `--high` for your energy now) |
-| `f` | `focus` | Start the focus timer (`--pomo`, `--flow`, `--box 45`) |
-| `b` | `start` | Mark the task as started |
-| `d` | `done` | Mark the task as done |
-| `s` | `skip` | Skip the task for today |
-| `x` | `split` | Split the task into smaller steps: `t x "outline" "draft intro"` |
-| `a` | `add` | Add a task. `t <text>` also works. |
-| `t` | `triage` | Sort the inbox |
-| `l` | `ls` | Show the full queue with reasons |
-| `e` | `edit` | Change a task: `t e 12 due:fri v:3` |
-| `h` | `wait` | Put the task on hold: `t wait 4 mon` |
-| `k` | `drop` | Remove a task you no longer need |
-| | `status` | Set any state: `t status 4 todo` |
-| `r` | `resolve` | Decide what to do with slipped tasks |
-| `p` | `plan` | Show today's schedule (`--ics` exports it) |
-| `c` | `gantt` | Show the next 7 days as a chart (`--days 14`) |
-| `v` | `review` | Weekly review |
-| `g` | `goals` | Show goal progress. `t g add thesis 3h` adds a goal, `t g rm thesis` removes it. |
-| `w` | `wins` | Show what you finished today (`--week` for the whole week) |
-| `i` | `stats` | How your plans usually go: time, dates, push-backs |
-| | `plugins` | List installed plugins and hooks |
+| `n` | `next` | The one thing to do now |
+| `f` | `focus` | A focus timer on it |
+| `b` | `start` | Mark it started (focus does this too) |
+| `d` | `done` | Mark it done |
+| `s` | `skip` | Skip it for today, no questions asked |
+| `x` | `split` | Break it into smaller steps |
+| `h` | `wait` | On hold, waiting for someone |
+| `k` | `drop` | Let a task go |
+| | `status` | Set any state |
 | `u` | `undo` | Undo the last change |
-| `?` | `help` | Show all commands and the syntax |
-| | `features` | Turn optional parts on and off: `t features off states` |
-| | `notify` | Send new reminders (`--install` sets up a timer) |
-| | `backup` | Save a copy of your data now |
-| | `restore` | List copies, or go back to one: `t restore 2` |
-| | `export` | Write all data as JSON lines |
-| | `import` | Load an export: `t import tasks.jsonl` |
+| `a` | `add` | Capture a task (or just: `t <text>`) |
+| `t` | `triage` | Sort the inbox, 3 quick questions each |
+| `e` | `edit` | Change a task |
+| `r` | `resolve` | Decide what to do with slipped tasks |
+| `v` | `review` | Weekly review, about 5 minutes |
+| `l` | `ls` | The queue, in order, with the reason for each |
+| `p` | `plan` | Today's schedule, built with the same rules |
+| `c` | `gantt` | The next days as a chart |
+| `g` | `goals` | Goals and weekly progress |
+| `w` | `wins` | What you got done today |
+| `i` | `stats` | How your plans usually go: time, dates, push-backs |
+| | `backup` | Save a copy of your data now (one is made every day) |
+| | `restore` | List copies, or go back to one |
+| | `export` | All data as JSON lines |
+| | `import` | Load an export |
+| | `notify` | Send new reminders |
+| | `features` | Turn optional parts on and off |
+| | `plugins` | List plugins and hooks |
+| `?` | `help` | All commands, or one in detail |
+| | `doctor` | Check the setup, with a fix for each problem |
+| | `completion` | Shell completion script |
 
-In zsh, `?` is a wildcard, so use `t help` on the command line. In interactive
-mode, `?` works as a key.
+In zsh, `?` is a wildcard, so type `t help` on the command line. `t --version`
+shows the version.
 
-Without an id, `done`, `skip`, `split`, `edit`, `drop` and `focus` act on the
-task that `next` showed last.
+## Adding details
 
-## Syntax for adding tasks
+Words become the title. Details set the fields. You can put them anywhere.
 
-Words become the title. Tokens set the fields. You can put tokens anywhere.
-
-| Token | Meaning | Example |
+| Detail | Meaning | Example |
 |---|---|---|
 | `+name` | Goal | `+thesis` |
 | `due:<date>` | Hard deadline | `due:fri` |
@@ -453,17 +465,93 @@ Words become the title. Tokens set the fields. You can put tokens anywhere.
 
 Dates: `today`, `tom`, `mon` to `sun`, `+3d`, `+2w`, `oct20`, `10-20`,
 `2026-10-20`, `1st` or `15th` (of this or next month), `eow` (end of week),
-`eom` (end of month). Use `due:none` to
-clear a date.
+`eom` (end of month). `due:none` clears a date.
 
-`!2` and `~45m` also work, but zsh changes them before Tend can read them.
-Use them only inside quotes.
+`!2` and `~45m` also work, but zsh changes them before Tend can read them, so
+use them only inside quotes.
 
-## Turning features off
+## Settings
+
+The settings file is `~/.config/tend/config.toml`. Tend creates it on first run,
+with a comment on each line. Delete a line to go back to its default. If a value
+is wrong, Tend says which one and stops, and `t doctor` lists every problem.
+
+```toml
+# Tend configuration. Delete a line to go back to its default.
+
+[focus]
+default_mode = "pomo"     # pomo | flow | box
+pomo_work = 25            # minutes
+pomo_break = 5
+box_minutes = 45
+flow_break_ratio = 0.2    # flow mode: break earned = 20% of time worked
+
+[priority]
+hours_per_day = 4         # realistic focused hours per day (used to compute slack)
+at_risk_slack_days = 1    # rule 1: a deadline with this much slack or less comes first
+calibrate = true          # learn time and date corrections from finished tasks
+max_started = 3           # warn when more tasks than this are started at once
+
+[schedule]
+day_start = "09:00"       # t plan only books time inside this window
+day_end = "18:00"
+work_days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+max_block = 90            # longest focus block, minutes
+break_minutes = 10        # gap between blocks
+horizon_days = 14         # how far ahead t plan looks for deadline problems
+
+[calendar]
+ics = []                  # busy times, e.g. ["~/cal/uni.ics", "https://.../basic.ics"]
+
+[review]
+every_days = 7            # show "review due" after this many days
+
+[energy]
+high = []                 # hard work hours, e.g. ["09:00-12:00"]; tasks tagged @high go here
+low = []                  # easy work hours, e.g. ["14:00-16:00"]; tasks tagged @low fit here
+
+[slips]
+quiet_rollovers = 2       # a missed soft target rolls forward quietly this many times
+
+[ui]
+footer = true             # show the command bar under every output
+theme = "dark"            # dark | light | plain (no color, ASCII only)
+
+[backup]
+keep_days = 7             # a copy of your data is made every day; this many are kept
+folder = ""               # where copies go; empty means next to the database
+
+[reminders]
+every_minutes = 15        # how often the timer from `t notify --install` runs
+quiet_outside_day = true  # no reminders outside [schedule] day_start..day_end
+
+[features]                # optional parts of Tend; false removes a part completely
+review = true             # weekly review and its reminder
+learning = true           # corrections learned from your history, and t stats
+planning = true           # t plan, t gantt and calendar import
+hooks = true              # scripts that run after events
+plugins = true            # t-<name> programs run as t <name>
+energy = true             # energy windows and @high / @low tasks
+states = true             # started and waiting states
+repeat = true             # repeating tasks (every:mon)
+reminders = true          # desktop reminders from a timer (t notify)
+```
+
+Set `TEND_DB`, `TEND_CONFIG` or `TEND_HOOKS` to use another data file, settings
+file or hooks folder.
+
+### Themes
+
+`theme = "dark"` suits dark terminals and `"light"` suits light ones. `"plain"`
+uses no color and only ASCII characters, for screen readers, logs and simple
+terminals. Tend also follows the `NO_COLOR` environment variable.
+
+### Features
 
 The core of Tend is always on: capture, triage, the three rules, the focus
-timer, split, skip, slipped tasks, goals, wins, undo and JSON. Everything added
-after 0.1 is a **feature** you can turn off, like a plugin you don't install.
+timer, split, skip, slipped tasks, goals, wins, undo, backups and JSON.
+Everything else is a **feature** you can turn off, like a plugin you don't
+install:
 
 ```sh
 t features                  # list features and whether they are on
@@ -483,14 +571,11 @@ t features on states
 | `repeat` | 0.8 | repeating tasks (`every:mon`) |
 | `reminders` | 0.8 | desktop reminders (`t notify`) |
 
-When a feature is off, it is gone: its commands, keys, help lines, warnings
-and effects on ranking and planning. If you run one of its commands, Tend tells
-you how to turn it back on. Your data is kept. For example, with `states` off,
+When a feature is off, it is gone: its commands, keys, help lines, warnings and
+effects on ranking and planning. If you run one of its commands, Tend tells you
+how to turn it back on. Your data is kept. For example, with `states` off,
 waiting tasks are back in the queue as normal tasks. Turn `states` on again and
 they are waiting again.
-
-The switches are in the `[features]` section of the config file, so you can
-also edit them there.
 
 ## Hooks and plugins
 
@@ -500,25 +585,19 @@ write them in any language.
 ### Plugins
 
 Any program named `t-<name>` on your PATH runs as `t <name>`. It gets the
-arguments you typed, plus these environment variables:
+arguments you typed, plus `TEND_DB` (the database), `TEND_CONFIG` (the settings
+file) and `TEND_VERSION`. A plugin can read data with any command's `--json`
+output, or with SQL. A plugin can't replace a built-in command. `t plugins`
+lists what is installed.
 
-| Variable | Value |
-|---|---|
-| `TEND_DB` | path to the SQLite database |
-| `TEND_CONFIG` | path to the config file |
-| `TEND_VERSION` | Tend's version |
-
-A plugin can read data with `t ls --json` (or any command with `--json`), or with
-SQL. Commands always come first: a plugin can't replace a built-in command.
-`t plugins` lists what is installed.
-
-Two examples are in `examples/plugins/`:
+Examples in `examples/plugins/`:
 
 - `t-md` prints the queue as a Markdown checklist (`t md > todo.md`).
-- `t-pushed` lists the most pushed-back tasks with the history of each date,
-  read straight from the database.
+- `t-pushed` lists the most pushed-back tasks with the history of each date.
+- `t-import-todotxt`, `t-import-taskwarrior` and `t-import-csv` move your tasks
+  from other apps (see [Moving from another app](#moving-from-another-app)).
 
-![The t-pushed example plugin](docs/plugins.png)
+![The t-pushed example plugin](https://raw.githubusercontent.com/alexhergomz/Tend/main/docs/plugins.png)
 
 ### Hooks
 
@@ -551,8 +630,8 @@ appends each finished task to a CSV file.
 
 ## Your data
 
-All data is in one SQLite file. Run `t help` to see its path. By default it is
-`~/.local/share/tend/tend.db`.
+All data is in one SQLite file, by default `~/.local/share/tend/tend.db`.
+`t help` shows the path.
 
 | Table | Contents |
 |---|---|
@@ -575,7 +654,7 @@ export format, hook payloads and the plugin environment.
 
 ### Backups
 
-Tend copies your data **every day**, the first time you use it that day. It
+Tend copies your data **every day**, the first time you use it that day, and
 keeps the last 7 daily copies. It also saves a copy before every restore and
 every import. Copies are made with SQLite's backup function, so they are never
 half-written.
@@ -586,8 +665,8 @@ t restore           # list all copies, newest first
 t restore 2         # go back to copy 2. Your current data is saved first.
 ```
 
-To keep copies somewhere else, for example in a synced folder, set
-`folder` in the `[backup]` section of the config.
+To keep copies somewhere else, for example in a synced folder, set `folder` in
+the `[backup]` section of the settings.
 
 ### Export and import
 
@@ -598,10 +677,10 @@ t import tasks.jsonl          # add the tasks to what you have
 t import tasks.jsonl --replace --yes   # make an exact copy instead
 ```
 
-- **Into an empty database,** an import is an exact copy, ids and history
+- **Into an empty database,** an import is an exact copy, numbers and history
   included. Use this to move Tend to another computer.
-- **Into a database with tasks,** an import adds them as new tasks. Ids are
-  renumbered, split tasks stay linked, and goals are matched by name. A task with
+- **Into a database with tasks,** an import adds them as new tasks. Numbers are
+  changed, split tasks stay linked, and goals are matched by name. A task with
   the same title and creation time as one you have is skipped, so importing the
   same file twice adds nothing twice.
 - `--replace` swaps all your data for the file. It asks first, or needs `--yes`.
@@ -609,8 +688,7 @@ t import tasks.jsonl --replace --yes   # make an exact copy instead
 
 ### Moving from another app
 
-Three importer plugins are in `examples/plugins/`. Copy them to a folder on your
-PATH, then:
+Copy the importer plugins from `examples/plugins/` to a folder on your PATH, then:
 
 | From | Command | Maps |
 |---|---|---|
@@ -621,107 +699,67 @@ PATH, then:
 Each one converts the file to Tend's export format and passes it to `t import`.
 Add `--dry-run` to see the converted data without importing it.
 
-## Configuration
+## When something is wrong
 
-The config file is `~/.config/tend/config.toml`. Tend creates it on first run,
-with a comment on each option.
+`t doctor` checks your setup and changes nothing. It checks the settings file,
+the database, backups, calendars, hooks, plugins and reminders, and gives a fix
+for each problem. It works even when the settings file is broken.
 
-```toml
-[focus]
-default_mode = "pomo"     # pomo | flow | box
-pomo_work = 25            # minutes
-pomo_break = 5
-box_minutes = 45
-flow_break_ratio = 0.2
-
-[priority]
-hours_per_day = 4         # focused hours per day, used to compute slack
-at_risk_slack_days = 1    # rule 1 limit
-calibrate = true          # learn time and date corrections from finished tasks
-max_started = 3           # warn when more tasks than this are started at once
-
-[schedule]
-day_start = "09:00"       # t plan only books time inside this window
-day_end = "18:00"
-work_days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
-max_block = 90            # longest focus block, in minutes
-break_minutes = 10        # gap between blocks
-horizon_days = 14         # how far ahead t plan checks deadlines
-
-[calendar]
-ics = []                  # .ics files or URLs with busy times
-
-[review]
-every_days = 7
-
-[energy]
-high = []                 # e.g. ["09:00-12:00"]
-low = []                  # e.g. ["14:00-16:00"]
-
-[backup]
-keep_days = 7             # daily copies to keep
-folder = ""               # empty: next to the database
-
-[reminders]
-every_minutes = 15        # how often the timer from t notify --install runs
-quiet_outside_day = true  # no reminders outside day_start..day_end
-
-[features]                # false removes a part completely
-review = true
-learning = true
-planning = true
-hooks = true
-plugins = true
-energy = true
-states = true
-
-[slips]
-quiet_rollovers = 2       # how many times a missed soft target moves without a message
-
-[ui]
-footer = true             # show the command bar
+```
+ ✓ tend       Tend 1.0.0 · Python 3.13.7 · linux
+ ✗ config     day_start in [schedule] should be a time like 09:00, not '9am'
+              fix: edit ~/.config/tend/config.toml
+ ! hooks      on_finish is not an event, so it never runs
+              fix: rename it to one of: on_add, on_done, …
+ ✓ data       ~/.local/share/tend/tend.db · 12 open tasks
 ```
 
-Set `TEND_DB`, `TEND_CONFIG` or `TEND_HOOKS` to use a different data file,
-config file or hooks folder.
+If your data looks wrong, `t restore` lists the daily copies to go back to.
+
+## Stability
+
+Tend 1.0 is a promise. For every 1.x version:
+
+- Commands, keys and details (`due:`, `v:`, `+goal`, …) keep working.
+- The database, `--json` output, export format, hook events and plugin
+  environment only grow. Nothing is removed, renamed or given a new meaning.
+- Every version opens data made by any earlier version. This is tested with a
+  database made by each release.
+- If something must go, it is marked as deprecated in the
+  [changelog](CHANGELOG.md) first, and keeps working until 2.0.
+
+The details are in [docs/data.md](docs/data.md#stability). The screens
+themselves are for people and can change; scripts should use `--json`.
 
 ## Development
 
 ```sh
 uv sync
-uv run pytest
+uv run pytest            # about 160 tests, including old databases and a real terminal
+uv run ruff check src tests
 ```
 
-The code is small and split by job:
-
-| File | Job |
+| Where | What |
 |---|---|
-| `priority.py` | The three rules. Pure functions with no I/O, so you can replace them. |
-| `plan.py` | The scheduler. It calls `priority.py` for every free slot. |
-| `ics.py` | Reads calendar files |
-| `calibrate.py` | Corrections learned from your history |
-| `energy.py` | Energy windows |
-| `hooks.py` | Hooks and plugin lookup |
-| `features.py` | Feature switches |
-| `docs/logo/` | Logo: light and dark wordmark, and an icon |
-| `backup.py`, `transfer.py` | Backups, export and import |
-| `repeat.py`, `reminders.py` | Repeat rules and reminders |
-| `store.py` | SQLite schema, events and undo |
-| `parse.py` | Syntax for tasks, dates and durations |
-| `commands.py` | One function per command |
-| `tui.py`, `focus.py` | Interactive mode and the timer |
+| `priority.py` | The three rules. Pure functions with no I/O. |
+| `plan.py` | The scheduler. It asks `priority.py` for every free slot. |
+| `repeat.py`, `energy.py`, `calibrate.py`, `slips.py` | Repeat rules, energy windows, learned corrections, missed dates |
+| `store.py`, `model.py` | SQLite schema, migrations, events and undo |
+| `registry.py` | Every command declares its name, key, help and feature here |
+| `commands/` | The commands, by topic: doing, capture, deciding, looking, system |
+| `app.py` | One run of Tend: settings, data, the queue, output |
+| `ui.py`, `views.py`, `tui.py`, `focus.py` | Screens, themes, interactive mode, the timer |
+| `config.py`, `features.py`, `hooks.py` | Settings and their checks, feature switches, hooks and plugins |
+| `backup.py`, `transfer.py`, `ics.py`, `reminders.py` | Backups, export and import, calendars, reminders |
+| `doctor.py`, `completion.py`, `manpage.py` | `t doctor`, shell completion, the man page |
 
-The GIFs are recordings of the real program. To rebuild them, run
-`docs/demo/render.sh`. It needs [agg](https://github.com/asciinema/agg) and
-ffmpeg.
+The man page is made from the command list: `python -m tend.manpage > docs/t.1`.
+The GIFs are recordings of the real program: `docs/demo/render.sh` rebuilds them
+(it needs [agg](https://github.com/asciinema/agg) and ffmpeg). The logo is in
+`docs/logo/`.
 
 ## Roadmap
 
-| Version | What |
-|---|---|
-| 0.1 to 0.8 | Done: the core, review, learning, planning, hooks, plugins, energy, states, backups, export and import, repeating tasks, reminders |
-| 0.9 | First-run guide, shell completion, themes, `t doctor` |
-| 1.0 | Stable data and plugin interfaces, PyPI release |
-
-Every feature after 0.1 can be turned off. [ROADMAP.md](ROADMAP.md) has the
-details and the rules each release follows.
+Tend 1.0 has everything on the original roadmap. From here, the core stays small
+and new ideas start as plugins. [ROADMAP.md](ROADMAP.md) has the history and the
+rules each release follows.

@@ -32,6 +32,7 @@ class Late:
     task: Task
     finish: date | None  # None: doesn't fit in the horizon at all
     minutes_left: float  # work not scheduled before the deadline
+    due: date  # the deadline that applies (it can come from the task it was split from)
 
 
 @dataclass
@@ -42,6 +43,7 @@ class Plan:
     capacity: dict[date, float] = field(default_factory=dict)  # focus minutes available
     late: list[Late] = field(default_factory=list)
     unplanned: list[tuple[Task, float]] = field(default_factory=list)  # open work beyond the horizon
+    deadlines: dict[int, date] = field(default_factory=dict)  # task id -> the deadline that applies
 
     def on(self, day: date) -> list[Block]:
         return [b for b in self.blocks if b.start.date() == day]
@@ -100,6 +102,11 @@ def schedule(
     finished_on: dict[int, date] = {}
     today = now.date()
     plan = Plan(days=[today + timedelta(days=i) for i in range(days)])
+    by_id = {t.id: t for t in tasks if t.status == "open"}
+    for t in open_tasks:
+        due, _ = priority.deadline(t, by_id)
+        if due:
+            plan.deadlines[t.id] = due
 
     # start at the next 5 minute mark
     now = now.replace(second=0, microsecond=0) + timedelta(minutes=(-now.minute) % 5 or 0)
@@ -123,7 +130,7 @@ def schedule(
                 pending, today=day, goal_targets=goal_targets, goal_minutes=week_goal,
                 goal_worked_today=worked_goal, logged=logged, blocked=blocked,
                 hours_per_day=hours_per_day, at_risk_days=at_risk_days, calibration=calibration,
-                hard_shift=hard_shift, soft_shift=soft_shift, energy_now=level,
+                hard_shift=hard_shift, soft_shift=soft_shift, energy_now=level, by_id=by_id,
             )
             fits = [r for r in ranked if r.rule == 1 or energy.allowed(r.task.energy, level, windows)]
             if not fits:
@@ -155,10 +162,11 @@ def schedule(
     for t in open_tasks:
         if remaining[t.id] > 0.5:
             plan.unplanned.append((t, remaining[t.id]))
-        if t.due:
+        due = plan.deadlines.get(t.id)
+        if due:
             finish = finished_on.get(t.id)
-            if finish is None or finish > t.due:
-                before = sum(b.minutes for b in plan.blocks if b.task.id == t.id and b.start.date() <= t.due)
+            if finish is None or finish > due:
+                before = sum(b.minutes for b in plan.blocks if b.task.id == t.id and b.start.date() <= due)
                 total = sum(b.minutes for b in plan.blocks if b.task.id == t.id) + max(remaining[t.id], 0)
-                plan.late.append(Late(t, finish, total - before))
+                plan.late.append(Late(t, finish, total - before, due))
     return plan

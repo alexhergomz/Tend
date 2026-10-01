@@ -1,10 +1,13 @@
-# Roadmap to 1.0
+# Roadmap
+
+Tend 1.0 has everything that was planned. This page keeps the rules every
+release follows, what each version added, and how new ideas get in.
 
 ## Rules for every release
 
-1. **The core stays small.** The core is everything from 0.1: capture, triage,
-   the three rules, focus timer, split, skip, slipped tasks, goals, wins, undo
-   and JSON output. It can't be turned off.
+1. **The core stays small.** The core is capture, triage, the three rules, the
+   focus timer, split, skip, slipped tasks, goals, wins, undo, backups and JSON
+   output. It can't be turned off.
 2. **Everything else is a feature you can turn off.** Each new part ships with a
    switch in `[features]`. When it is off, its commands, keys and effects are
    gone. Your data is kept, so you can turn it on again later.
@@ -12,9 +15,12 @@
    simple rule, Tend stores the data and leaves the rest to plugins.
 4. **New ideas start as plugins.** A plugin moves into Tend only if many people
    need it and it fits these rules.
-5. **Your data is safe.** Every schema change has a migration and a test.
+5. **Your data is safe.** Every schema change has a migration, and a test that
+   opens a database made by each earlier release.
+6. **The promise holds.** In 1.x, nothing in [docs/data.md](docs/data.md) is
+   removed or changes meaning (see its Stability section).
 
-## Done
+## What each version added
 
 | Version | What | Feature switch |
 |---|---|---|
@@ -32,43 +38,28 @@
 | 0.7 | Importers for todo.txt, Taskwarrior and CSV | plugins in `examples/` |
 | 0.8 | Repeating tasks (`every:`) | `repeat` |
 | 0.8 | Reminders (`t notify`, timer install, `on_remind` hook) | `reminders` |
+| 0.9 | First-run guide, shell completion, themes, `t doctor`, speed | core |
+| 1.0 | Stability promise, migration tests for every release, man page, PyPI | core |
 
-## 0.9: Easy to start, pleasant to use
+The [changelog](CHANGELOG.md) has the details of each version.
 
-- **First run.** On an empty database, `t` shows a three-step guide: add a task,
-  run `t next`, and try `t focus`. It doesn't come back after that.
-- **Shell completion** for bash, zsh and fish, including task ids with titles and
-  goal names. `t completion zsh` prints the script.
-- **Colors.** Respects `NO_COLOR`. A `[ui] theme` option with `dark`, `light`
-  and `plain`. `plain` uses no color and no box characters, for screen readers
-  and logs.
-- **`t doctor`.** Checks the config, calendar URLs, hook permissions, the PATH
-  for plugins, and database integrity. Each problem comes with a fix.
-- **Speed.** Startup under 150 ms with 5,000 tasks, checked by a test.
+## After 1.0
 
-## 1.0: Stable
+There is no feature list for 1.x on purpose. Tend should stay small enough to
+trust. Changes after 1.0 are:
 
-1.0 is a promise, not a feature list.
+- **Fixes,** in patch releases (1.0.1, 1.0.2, …).
+- **Small additions** that fit the rules above, in minor releases (1.1, 1.2, …).
+  Each one is a feature you can turn off.
+- **Anything bigger starts as a plugin.** Good plugin ideas, which can all be
+  built on hooks, `--json` and the database:
+  - **Sync between devices.** The database is one file, so Syncthing or similar
+    works if only one device writes at a time. A real sync plugin can use the
+    `on_change` hook and the `events` table.
+  - **Phone or web apps.**
+  - **Habit streaks** from the `series` of a repeating task.
+  - **Reports and charts** of focus time, goals and estimates.
+  - **AI suggestions,** such as splitting tasks or guessing estimates.
+  - **Shared or team tasks.**
 
-- **Stable public interfaces:** the database schema, `--json` output, hook
-  payloads and the plugin environment. From 1.0 on, a breaking change needs a
-  new major version. Old fields are kept and marked as deprecated for at least
-  one minor version first.
-- **Migrations tested from every earlier version**, using saved databases from
-  each release.
-- **Packaging.** Published on PyPI so `pipx install` and `uv tool install` work
-  without cloning. Release notes in `CHANGELOG.md` and a man page.
-- **No known bugs that lose data or hide a deadline.**
-
-## Not planned: good plugin ideas
-
-These are useful, but they don't fit the core. They can all be built on hooks,
-`--json` and the database.
-
-- **Sync between devices.** The database is one file, so Syncthing or similar
-  works if only one device writes at a time. A real sync plugin can use the
-  `on_change` hook and the `events` table.
-- **Phone or web apps.**
-- **AI suggestions,** such as splitting tasks or guessing estimates.
-- **Shared or team tasks.**
-- **Reports and charts** of focus time, goals and estimates.
+A 2.0 only happens if something in the stable interfaces truly has to change.

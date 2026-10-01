@@ -1,11 +1,29 @@
 # Data reference
 
-**Version 1** · database schema 4 · export format 1 · Tend 0.8
+**Version 1.0** · database schema 4 · export format 1 · Tend 1.0
 
 This page describes everything a plugin, hook or script can rely on: the
 database, the JSON output, the export format, hook payloads and the plugin
-environment. Until 1.0 these can still change. Each change is listed in the
-release notes, and the database is migrated automatically.
+environment.
+
+## Stability
+
+From Tend 1.0, everything on this page is stable for all 1.x versions:
+
+- **Nothing is removed or renamed.** Tables, columns, JSON fields, hook events,
+  payload fields, environment variables, commands, keys and the details you type
+  (`due:`, `v:`, `+goal`, …) keep working as they are described here.
+- **Things can be added.** New columns, new JSON fields, new hook events and new
+  commands can appear in any 1.x release. Write code that ignores what it doesn't know.
+- **Meanings stay the same.** A column or field never starts to mean something else.
+- **Old data keeps working.** Every new version opens a database made by any
+  earlier version, and the change is tested for each release.
+- **Deprecation before removal.** If something must go, it is marked as
+  deprecated in the changelog and keeps working for the rest of 1.x. It can only
+  be removed in 2.0.
+
+Not covered: the `meta` table, the exact text and colors on screen, and the
+order of keys in the command bar. The screens are for people; use `--json` in scripts.
 
 ## Database
 
@@ -92,7 +110,7 @@ Add `--json` to any command. Times are ISO strings.
 | Command | Output |
 |---|---|
 | `t next` | One ranked task, or `null` |
-| `t ls` | A list of ranked tasks, in queue order |
+| `t ls` | A list of all ranked tasks, in queue order (the screen shows 20) |
 | `t add`, `t edit`, `t done`, `t start`, `t wait`, `t status` | The task after the change |
 | `t plan`, `t gantt` | `{"blocks", "events", "late", "corrections"}` |
 | `t stats` | `{"time", "soft", "hard", "start_to_done", "pushes"}` |
@@ -101,12 +119,14 @@ Add `--json` to any command. Times are ISO strings.
 | `t features` | Each feature with `on`, `since`, `what`, `commands` |
 | `t plugins` | `{"plugins", "hooks"}` |
 | `t restore` | A list of copies with `n`, `path`, `kind`, `made`, `open_tasks` |
+| `t doctor` | A list of checks with `level` (`ok`, `info`, `warn`, `error`), `area`, `text`, `fix` |
 | `t notify` | `{"quiet", "reminders"}`, each reminder with `key`, `title`, `body`, `task_id`. Shows what is pending, sends nothing |
 
 A **ranked task** is a task row plus:
 
 | Field | Meaning |
 |---|---|
+| `deadline` | The hard deadline that applies: the task's own, or an earlier one of the task it was split from |
 | `rule` | 1 deadline at risk · 2 big rock · 3 WSJF |
 | `score` | `(value + urgency) / size` |
 | `urgency` | 1–3 |

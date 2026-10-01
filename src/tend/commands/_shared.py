@@ -13,6 +13,12 @@ def title(t: Task) -> str:
     return f"[bold]{escape(t.title)}[/]"
 
 
+def fresh(app: App, t: Task) -> Task | None:
+    """The task as it is now, or None if it was closed meanwhile (a loop may have dropped it)."""
+    now = app.store.task(t.id)
+    return now if now and now.status == "open" else None
+
+
 def ids_in(args: list[str]) -> list[str]:
     return [a for a in args if a.lstrip("#").isdigit()]
 

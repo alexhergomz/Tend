@@ -111,9 +111,10 @@ class Store:
         self._cache: dict[str | None, list[Task]] = {}  # tasks by status, cleared on every change
         self.generation = 0  # goes up on every change, for caches built on top
         self.on_event = None  # called as on_event(kind, summary, changes) after each commit
-        self._migrate()
+        self.migrate()
 
-    def _migrate(self):
+    def migrate(self):
+        """Bring the database to the current schema. Safe to run more than once."""
         have = {r["name"] for r in self.db.execute("PRAGMA table_info(tasks)")}
         added = [c for c in NEW_COLUMNS if c not in have]
         for c in added:
@@ -186,14 +187,17 @@ class Store:
         if row["kind"] in BARRIERS:
             raise UndoBlocked(row["kind"])
         for ch in reversed(json.loads(row["changes"])):
-            if ch["before"] is None:
+            if ch["before"] is None:  # the change added this task: remove it, and its focus time
+                self.db.execute("DELETE FROM sessions WHERE task_id = ?", (ch["id"],))
                 self.db.execute("DELETE FROM tasks WHERE id = ?", (ch["id"],))
-            else:
-                b = ch["before"]
-                self.db.execute(
-                    f"INSERT OR REPLACE INTO tasks ({','.join(COLS)}) VALUES ({','.join('?' * len(COLS))})",
-                    [b.get(c, DEFAULTS.get(c)) for c in COLS],
-                )
+                continue
+            # an older version's snapshot may lack newer columns: keep their current values
+            now = self.db.execute("SELECT * FROM tasks WHERE id = ?", (ch["id"],)).fetchone()
+            values = {**(dict(now) if now else DEFAULTS), **ch["before"]}
+            self.db.execute(
+                f"INSERT OR REPLACE INTO tasks ({','.join(COLS)}) VALUES ({','.join('?' * len(COLS))})",
+                [values.get(c, DEFAULTS.get(c)) for c in COLS],
+            )
         self.db.execute("UPDATE events SET undone = 1 WHERE id = ?", (row["id"],))
         self.db.commit()
         self.changed()

@@ -36,6 +36,7 @@ def _theme(name: str) -> Theme:
         "accent": colors["accent"], "warn": colors["warn"], "dim": colors["dim"],
         "accent.bold": f"bold {colors['accent']}".replace(" none", ""),
         "warn.bold": f"bold {colors['warn']}".replace(" none", ""),
+        "dim.bold": f"bold {colors['dim']}".replace(" none", ""),
     })
 
 
@@ -180,7 +181,7 @@ def help_screen(shown, version: str, config_path, data_path, extensions: bool):
             continue
         tbl = Table(box=None, show_header=False, padding=(0, 2), title=None)
         tbl.add_column(style=ACCENT_B, width=1)
-        tbl.add_column(style="bold", width=9)
+        tbl.add_column(style="bold", width=max(len(c.name) for c in registry.listed()))
         tbl.add_column(style=DIM)
         for c in cmds:
             tbl.add_row(c.key, c.name, c.help)
@@ -191,7 +192,8 @@ def help_screen(shown, version: str, config_path, data_path, extensions: bool):
         "t write ch.2 intro +thesis due:fri v:3 e:2h",
         "+goal   due:<date> hard deadline   aim:<date> soft target   after:<date> hide until",
         "v:1..3 value (nice to have · matters · really matters)   s:S|M|L size   e:45m estimate",
-        "@high / @low energy   ·   every:mon every:2w every:month every:1st repeat   ·   none clears, as in due:none",
+        "@high / @low energy   ·   every:mon every:2w every:month every:1st repeat",
+        "none clears a detail, as in due:none or every:none",
         "dates: today tom fri +3d +2w oct20 10-20 2026-10-20 1st eow eom",
         "--json on any command prints machine-readable output",
     ):

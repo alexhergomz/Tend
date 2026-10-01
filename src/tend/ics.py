@@ -80,51 +80,56 @@ def parse(text: str, start: datetime, end: datetime) -> list[Event]:
     for props in vevents:
         p = {name: (params, value) for name, params, value in props}
         if "RECURRENCE-ID" in p and "UID" in p:
-            rid = _parse_dt(*p["RECURRENCE-ID"])
+            try:
+                rid = _parse_dt(*p["RECURRENCE-ID"])
+            except ValueError:
+                continue
             if rid:
                 overridden.setdefault(p["UID"][1], set()).add(_local(rid))
 
     out = []
     for props in vevents:
-        p = {name: (params, value) for name, params, value in props}
-        if "DTSTART" not in p:
+        try:
+            out += _expand(props, overridden, start, end)
+        except (ValueError, TypeError, OverflowError):  # one broken event must not break the plan
             continue
-        if p.get("STATUS", ({}, ""))[1].upper() == "CANCELLED" or p.get("TRANSP", ({}, ""))[1].upper() == "TRANSPARENT":
-            continue
-        dtstart = _parse_dt(*p["DTSTART"])
-        if dtstart is None:
-            continue
-        if "DTEND" in p and (dtend := _parse_dt(*p["DTEND"])):
-            length = dtend - dtstart
-        else:
-            length = _duration(p["DURATION"][1]) if "DURATION" in p else timedelta(0)
-        title = p.get("SUMMARY", ({}, "busy"))[1].replace("\\,", ",").replace("\\;", ";")
-
-        if "RRULE" in p and "RECURRENCE-ID" not in p:
-            rule = p["RRULE"][1]
-            if dtstart.tzinfo is None:
-                rule = re.sub(r"(UNTIL=\d{8}T\d{6})Z", r"\1", rule)
-            elif not re.search(r"UNTIL=\d{8}T\d{6}Z", rule):
-                rule = re.sub(r"UNTIL=(\d{8})(?![T\d])", r"UNTIL=\1T235959Z", rule)
-            try:
-                rr = rrulestr(rule, dtstart=dtstart)
-            except (ValueError, TypeError):
-                continue
-            lo, hi = start - length - timedelta(days=1), end + timedelta(days=1)
-            if dtstart.tzinfo:
-                lo, hi = lo.astimezone(), hi.astimezone()
-            excluded = {_local(d) for name, params, value in props if name == "EXDATE"
-                        for v in value.split(",") if (d := _parse_dt(params, v))}
-            excluded |= overridden.get(p.get("UID", ({}, ""))[1], set())
-            starts = [_local(d) for d in rr.between(lo, hi, inc=True)]
-            starts = [s for s in starts if s not in excluded]
-        else:
-            starts = [_local(dtstart)]
-
-        for s in starts:
-            if s < end and s + length > start and length > timedelta(0):
-                out.append(Event(s, s + length, title))
     return sorted(out, key=lambda e: e.start)
+
+
+def _expand(props: list, overridden: dict[str, set[datetime]], start: datetime, end: datetime) -> list[Event]:
+    """The occurrences of one event between start and end."""
+    p = {name: (params, value) for name, params, value in props}
+    if "DTSTART" not in p:
+        return []
+    if p.get("STATUS", ({}, ""))[1].upper() == "CANCELLED" or p.get("TRANSP", ({}, ""))[1].upper() == "TRANSPARENT":
+        return []
+    dtstart = _parse_dt(*p["DTSTART"])
+    if dtstart is None:
+        return []
+    if "DTEND" in p and (dtend := _parse_dt(*p["DTEND"])):
+        length = _local(dtend) - _local(dtstart)
+    else:
+        length = _duration(p["DURATION"][1]) if "DURATION" in p else timedelta(0)
+    title = p.get("SUMMARY", ({}, "busy"))[1].replace("\\,", ",").replace("\\;", ";")
+
+    if "RRULE" in p and "RECURRENCE-ID" not in p:
+        rule = p["RRULE"][1]
+        if dtstart.tzinfo is None:  # floating time: UNTIL must be floating too, and cover its whole day
+            rule = re.sub(r"(UNTIL=\d{8}T\d{6})Z", r"\1", rule)
+            rule = re.sub(r"UNTIL=(\d{8})(?![T\d])", r"UNTIL=\1T235959", rule)
+        elif not re.search(r"UNTIL=\d{8}T\d{6}Z", rule):
+            rule = re.sub(r"UNTIL=(\d{8})(?![T\d])", r"UNTIL=\1T235959Z", rule)
+        rr = rrulestr(rule, dtstart=dtstart)
+        lo, hi = start - length - timedelta(days=1), end + timedelta(days=1)
+        if dtstart.tzinfo:
+            lo, hi = lo.astimezone(), hi.astimezone()
+        excluded = {_local(d) for name, params, value in props if name == "EXDATE"
+                    for v in value.split(",") if (d := _parse_dt(params, v))}
+        excluded |= overridden.get(p.get("UID", ({}, ""))[1], set())
+        starts = [s for s in (_local(d) for d in rr.between(lo, hi, inc=True)) if s not in excluded]
+    else:
+        starts = [_local(dtstart)]
+    return [Event(s, s + length, title) for s in starts if s < end and s + length > start and length > timedelta(0)]
 
 
 def fetch(source: str, cache_dir: Path) -> tuple[str | None, str | None]:

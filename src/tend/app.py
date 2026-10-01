@@ -50,7 +50,18 @@ class App:
         self.today = date.today()
         self.__dict__.pop("_corrections", None)
         slips.roll_over(self.store, self.today, self.cfg["slips"]["quiet_rollovers"])
-        self.woken = slips.wake_waiting(self.store, self.today)
+        woken = slips.wake_waiting(self.store, self.today)
+        if woken:  # kept for the day, so a reminder goes out whichever run woke them
+            seen = json.loads(self.store.get_meta("woken") or "{}")
+            ids = (seen.get("ids", []) if seen.get("day") == self.today.isoformat() else []) + [t.id for t in woken]
+            self.store.set_meta("woken", json.dumps({"day": self.today.isoformat(), "ids": ids}))
+
+    def woken_today(self) -> list[Task]:
+        """Waiting tasks that came back on their date today."""
+        seen = json.loads(self.store.get_meta("woken") or "{}")
+        if seen.get("day") != self.today.isoformat():
+            return []
+        return [t for i in seen.get("ids", []) if (t := self.store.task(i)) and t.status == "open"]
 
     @property
     def week_start(self) -> date:
@@ -160,7 +171,7 @@ class App:
         blocked = self.store.blocked_ids()
         started = sum(1 for t in tasks if t.stage == "started" and t.id not in blocked)
         return {
-            "at_risk": sum(1 for r in ranked if r.rule == 1 and r.task.due >= self.today),
+            "at_risk": sum(1 for r in ranked if r.rule == 1 and r.deadline >= self.today),
             "slipped": len(self.slipped()),
             "inbox": sum(1 for t in tasks if not t.triaged),
             "review": self.review_due(),
@@ -216,4 +227,5 @@ class App:
                 and t.id not in self.store.blocked_ids():
             return t
         ranked = self.ranked()
-        return ranked[0].task if ranked else None
+        # the queue may show a view of the task (features that are off are blanked out); commands get the real one
+        return self.store.task(ranked[0].task.id) if ranked else None

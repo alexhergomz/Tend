@@ -58,7 +58,7 @@ def _plan_json(app: App, plan) -> dict:
         "blocks": [{"task_id": b.task.id, "title": b.task.title, "start": b.start, "end": b.end, "rule": b.rule}
                    for b in plan.blocks],
         "events": [{"title": e.title, "start": e.start, "end": e.end} for e in plan.events],
-        "late": [{"task_id": x.task.id, "title": x.task.title, "due": x.task.due, "finish": x.finish,
+        "late": [{"task_id": x.task.id, "title": x.task.title, "due": x.due, "finish": x.finish,
                   "minutes_left": round(x.minutes_left)} for x in plan.late],
         "corrections": app.corrections.to_json(),
     }

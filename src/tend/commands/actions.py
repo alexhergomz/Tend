@@ -22,7 +22,10 @@ def next_copy(app: App, t: Task) -> Task | None:
     if not (t.repeat and app.on("repeat")):
         return None
     planned = t.due or t.aim or app.today
-    nxt = repeat.parse(t.repeat).next_after(planned, max(planned, app.today))
+    # count the rhythm from the first copy, so "every month" from the 31st comes back to the 31st after February
+    first = app.store.task(t.series) if t.series else t
+    anchor = (first.first_due or first.first_aim or first.due or first.aim) if first else None
+    nxt = repeat.parse(t.repeat).next_after(anchor or planned, max(planned, app.today))
     shift = nxt - planned
     copy = Task(id=None, title=t.title, goal=t.goal, value=t.value, size=t.size, estimate_min=t.estimate_min,
                 energy=t.energy, repeat=t.repeat, series=t.series or t.id,

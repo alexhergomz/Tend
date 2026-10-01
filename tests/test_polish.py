@@ -146,3 +146,23 @@ def test_fast_with_5000_tasks(tmp_path):
         timings.append(time.perf_counter() - start)
     # 0.15 s on a laptop; the limit leaves room for slow test machines
     assert min(timings) < 0.6, timings
+
+
+def test_every_style_name_resolves_in_every_theme():
+    """Rich silently drops a style it can't read, so check them all."""
+    import pathlib
+
+    from rich.console import Console
+
+    from tend import ui
+
+    for name in ui.THEMES:
+        console = Console(theme=ui._theme(name))
+        for style in ("accent", "warn", "dim", "accent.bold", "warn.bold", "dim.bold"):
+            console.get_style(style)  # raises if unknown
+    for path in pathlib.Path(ui.__file__).parent.rglob("*.py"):
+        if path.name == "ui.py":  # where the themes are built from colors
+            continue
+        text = path.read_text()
+        assert 'f"bold {' not in text and "f'bold {" not in text, f"{path}: combine styles with a theme name"
+

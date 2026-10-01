@@ -35,7 +35,10 @@ def parse_date(text: str, today: date) -> date:
             if name.startswith(s):
                 return today + timedelta(days=(i - today.weekday()) % 7)
     if m := re.fullmatch(r"(\d{1,2})(st|nd|rd|th)", s):  # the next 1st, 15th, ...
-        return repeat.parse(s).first(today)
+        try:
+            return repeat.parse(s).first(today)
+        except repeat.RuleError as e:
+            raise ParseError(str(e)) from None
     if m := re.fullmatch(r"\+?(\d+)([dw])", s):
         n = int(m[1]) * (7 if m[2] == "w" else 1)
         return today + timedelta(days=n)
@@ -55,7 +58,12 @@ def parse_date(text: str, today: date) -> date:
             d = date(today.year, month, day)
         except ValueError:
             raise ParseError(f"not a real date: {text}") from None
-        return d if d >= today else d.replace(year=today.year + 1)
+        year = today.year + (d < today)
+        while True:  # Feb 29 waits for the next leap year
+            try:
+                return d.replace(year=year)
+            except ValueError:
+                year += 1
     raise ParseError(f"can't read date '{text}' (try fri, oct20, +3d, 2026-10-20)")
 
 
@@ -63,13 +71,21 @@ def _month(abbr: str) -> int | None:
     return MONTHS.index(abbr) + 1 if abbr in MONTHS else None
 
 
+MAX_MINUTES = 1000 * 60  # 1,000 hours: anything longer is a typo
+
+
 def parse_duration(text: str) -> int:
     s = text.lower().strip()
+    minutes = None
     if m := re.fullmatch(r"(\d+(?:\.\d+)?)h(?:(\d+)m?)?", s):
-        return round(float(m[1]) * 60) + int(m[2] or 0)
-    if m := re.fullmatch(r"(\d+)m?", s):
-        return int(m[1])
-    raise ParseError(f"can't read duration '{text}' (try 45m, 2h, 1h30m)")
+        minutes = round(float(m[1]) * 60) + int(m[2] or 0)
+    elif m := re.fullmatch(r"(\d+)m?", s):
+        minutes = int(m[1])
+    if minutes is None:
+        raise ParseError(f"can't read duration '{text}' (try 45m, 2h, 1h30m)")
+    if minutes > MAX_MINUTES:
+        raise ParseError(f"'{text}' is longer than 1,000 hours. Split the task into steps instead.")
+    return minutes
 
 
 def size_for(minutes: int) -> str:

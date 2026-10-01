@@ -105,7 +105,7 @@ folder = ""               # where copies go; empty means next to the database
 every_minutes = 15        # how often the timer from `t notify --install` runs
 quiet_outside_day = true  # no reminders outside [schedule] day_start..day_end
 
-[features]                # optional parts of tend; false removes a part completely
+[features]                # optional parts of Tend; false removes a part completely
 review = true             # weekly review and its reminder
 learning = true           # corrections learned from your history, and t stats
 planning = true           # t plan, t gantt and calendar import

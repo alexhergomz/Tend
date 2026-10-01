@@ -1,0 +1,245 @@
+.TH T 1 "2026-10-01" "Tend 1.0.0" "Tend manual"
+.SH NAME
+t, tend \- a calm task manager that tells you what to do next, and why
+.SH SYNOPSIS
+.B t
+.br
+.B t
+.I command
+[\fIarguments\fR] [\fB\-\-json\fR]
+.br
+.B t
+.I any text to capture as a task
+.SH DESCRIPTION
+Tend shows one task at a time and says why it picked it. Three rules decide, in order: a hard deadline at risk comes first; then one task a day from the goal furthest behind its weekly target; then everything else by (value + urgency) / size.
+.PP
+Run t alone for interactive mode, where every command is one key. Anything that is not a command is added as a task. Every command prints JSON with \-\-json.
+.SH DOING
+.TP
+\fBt next\fR [\-\-low | \-\-high] (key n)
+The one thing to do now.
+.br
+\-\-low or \-\-high says how much energy you have right now (see energy windows).
+.TP
+\fBt focus\fR [id] [\-\-pomo | \-\-flow | \-\-box 45] (key f)
+A focus timer on it.
+.br
+pomo: 25 minutes of work, then a 5 minute break. flow: counts up with no forced stop; press b for a break sized to the time you worked. box: a hard stop after the given minutes. Keys while it runs: p pause, d done, q stop.
+.TP
+\fBt start\fR [id] (key b)
+Mark it started (focus does this too).
+.br
+Part of the 'states' feature.
+.TP
+\fBt done\fR [id] (key d)
+Mark it done.
+.TP
+\fBt skip\fR [id] (key s)
+Skip it for today, no questions asked.
+.TP
+\fBt split\fR [id] ["step" ...] (key x)
+Break it into smaller steps.
+.br
+Without steps, Tend asks for them one by one. Make the first one tiny.
+.TP
+\fBt wait\fR [id] [date] (key h)
+On hold, waiting for someone.
+.br
+The task leaves the queue. With a date, it comes back that day by itself.
+.br
+Part of the 'states' feature.
+.TP
+\fBt drop\fR [id] [\-\-once | \-\-stop] (key k)
+Let a task go.
+.br
+For a repeating task, \-\-once skips just this one and \-\-stop ends the series.
+.TP
+\fBt status\fR [id] todo|started|waiting|done|dropped
+Set any state.
+.br
+Part of the 'states' feature.
+.TP
+\fBt undo\fR (key u)
+Undo the last change.
+.SH CAPTURING
+.TP
+\fBt add\fR <text> [details] (key a)
+Capture a task (or just: t <text>).
+.br
+Anything that isn't a command is added as a task. Details: see `t help` under 'Adding details'.
+.TP
+\fBt triage\fR (key t)
+Sort the inbox, 3 quick questions each.
+.br
+For each new task: how much it matters, how big it is, and a date if it has one.
+.TP
+\fBt edit\fR [id] <details or new title> (key e)
+Change a task.
+.br
+Example: t e 12 due:fri v:3. A word that isn't a detail becomes the new title.
+.SH DECIDING
+.TP
+\fBt resolve\fR (key r)
+Decide what to do with slipped tasks.
+.br
+A task slips when its date passes. Each one needs one decision: today, a new date, split or drop.
+.TP
+\fBt review\fR (key v)
+Weekly review, about 5 minutes.
+.br
+Seven steps: last week, your patterns, inbox, slipped, waiting, old tasks, goals. q stops anywhere.
+.br
+Part of the 'review' feature.
+.SH LOOKING
+.TP
+\fBt ls\fR [\-\-all] [\-\-low | \-\-high] (key l)
+The queue, in order, with the reason for each.
+.br
+Shows the first 20 tasks; \-\-all shows every one. Waiting tasks are listed at the end.
+.TP
+\fBt plan\fR [\-\-ics] (key p)
+Today's schedule, built with the same rules.
+.br
+Books focus blocks around your calendar. \-\-ics prints the plan as a calendar file.
+.br
+Part of the 'planning' feature.
+.TP
+\fBt gantt\fR [\-\-days 14] (key c)
+The next days as a chart.
+.br
+Part of the 'planning' feature.
+.TP
+\fBt goals\fR [add <name> <weekly time> [why] | rm <name>] (key g)
+Goals and weekly progress.
+.br
+A goal with a weekly target gets one 'big rock' task a day (rule 2). Example: t g add thesis 3h
+.TP
+\fBt wins\fR [\-\-week] (key w)
+What you got done today.
+.TP
+\fBt stats\fR (key i)
+How your plans usually go: time, dates, push\-backs.
+.br
+The median of your last 20 finished tasks. Corrections start after 5 tasks of a kind.
+.br
+Part of the 'learning' feature.
+.SH YOUR DATA
+.TP
+\fBt backup\fR
+Save a copy of your data now (one is made every day).
+.TP
+\fBt restore\fR [number] [\-\-yes]
+List copies, or go back to one.
+.br
+Your current data is saved first, so a restore can be undone with another one.
+.TP
+\fBt export\fR [file]
+All data as JSON lines.
+.br
+Without a file, the data goes to stdout and nothing else is printed.
+.TP
+\fBt import\fR <file | \-> [\-\-replace] [\-\-yes]
+Load an export.
+.br
+Into an empty database: an exact copy. Otherwise the tasks are added, and tasks you already have are skipped. \-\-replace swaps all your data for the file. A copy is saved first.
+.SH SETUP
+.TP
+\fBt notify\fR [\-\-install | \-\-uninstall | \-\-test | \-\-dry\-run]
+Send new reminders.
+.br
+Run by a timer: \-\-install sets up a systemd user timer (Linux) or a launchd agent (macOS). Each reminder is sent once, and none outside the working day.
+.br
+Part of the 'reminders' feature.
+.TP
+\fBt features\fR [on | off <name> ...]
+Turn optional parts on and off.
+.br
+The core is always on. A feature that is off disappears; its data is kept.
+.TP
+\fBt plugins\fR
+List plugins and hooks.
+.br
+Part of the 'plugins' feature.
+.TP
+\fBt help\fR [command] (key ?)
+All commands, or one in detail.
+.TP
+\fBt doctor\fR
+Check the setup, with a fix for each problem.
+.br
+Checks the config, the database, backups, calendars, hooks, plugins and reminders. Changes nothing.
+.TP
+\fBt completion\fR bash | zsh | fish
+Shell completion script.
+.br
+bash: add eval "$(t completion bash)" to ~/.bashrc zsh: add source <(t completion zsh) to ~/.zshrc, after compinit fish: t completion fish > ~/.config/fish/completions/t.fish
+.SH ADDING DETAILS
+Words become the title; these set fields, anywhere in the line:
+.TP
+\fB+goal\fR
+Goal.
+.TP
+\fBdue:\fIdate\fR, \fBaim:\fIdate\fR, \fBafter:\fIdate\fR
+Hard deadline, soft target, hidden until. Dates: today, tom, mon to sun, +3d, +2w, oct20, 10\-20, 2026\-10\-20, 1st, eow, eom. none clears.
+.TP
+\fBv:\fR1..3, \fBs:\fRS|M|L, \fBe:\fItime\fR
+Value (nice to have, matters, really matters), size, estimate (45m, 2h).
+.TP
+\fB@high\fR, \fB@low\fR
+Energy the task needs.
+.TP
+\fBevery:\fIrule\fR
+Repeat: day, weekday, mon,thu, 3d, 2w, month, year, 1st, 15th, last. Only one copy exists at a time.
+.SH FEATURES
+Everything after version 0.1 can be turned off with t features off NAME:
+.TP
+\fBreview\fR
+weekly review and its reminder (since 0.2).
+.TP
+\fBlearning\fR
+corrections learned from your history, and t stats (since 0.2).
+.TP
+\fBplanning\fR
+t plan, t gantt and calendar import (since 0.3).
+.TP
+\fBhooks\fR
+scripts that run after events (since 0.4).
+.TP
+\fBplugins\fR
+t\-<name> programs run as t <name> (since 0.4).
+.TP
+\fBenergy\fR
+energy windows and @high / @low tasks (since 0.5).
+.TP
+\fBstates\fR
+started and waiting states (since 0.6).
+.TP
+\fBrepeat\fR
+repeating tasks (every:mon) (since 0.8).
+.TP
+\fBreminders\fR
+desktop reminders from a timer (since 0.8).
+.SH FILES
+.TP
+\fI~/.config/tend/config.toml\fR
+Settings, each with a comment.
+.TP
+\fI~/.local/share/tend/tend.db\fR
+Your data: one SQLite file.
+.TP
+\fI~/.local/share/tend/backups/\fR
+A copy of the data for each of the last 7 days.
+.TP
+\fI~/.config/tend/hooks/\fR
+Hooks: on_add, on_done, on_drop, on_skip, on_status, on_focus_start, on_focus_end, on_review, on_remind, on_change.
+.SH ENVIRONMENT
+.TP
+\fBTEND_DB\fR, \fBTEND_CONFIG\fR, \fBTEND_HOOKS\fR
+Use another database, config file or hooks folder.
+.TP
+\fBNO_COLOR\fR
+No colors. The plain theme also uses only ASCII.
+.SH EXIT STATUS
+0 on success, 1 for a usage error or a problem t doctor found, 2 for a config file that can't be used.
+.SH SEE ALSO
+https://github.com/alexhergomz/Tend

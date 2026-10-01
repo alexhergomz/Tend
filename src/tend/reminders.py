@@ -48,13 +48,14 @@ def collect(app, now: datetime) -> list[Reminder]:
         out.append(Reminder(f"morning:{today}", "Today starts with", f"{top.task.title} · {top.reason}", top.task.id))
     for r in ranked:
         t = r.task
-        if r.rule == 1 and t.due >= today:
-            out.append(Reminder(f"risk:{t.id}:{t.due}", "Deadline at risk",
-                                f"{t.title} · due {fmt.day(t.due, today)}, {r.reason.split(' · ', 1)[-1]}", t.id))
+        if r.rule == 1 and r.deadline >= today:
+            out.append(Reminder(f"risk:{t.id}:{r.deadline}", "Deadline at risk",
+                                f"{t.title} · due {fmt.day(r.deadline, today)}, {r.reason.split(' · ', 1)[-1]}",
+                                t.id))
         elif r.rule == 1:
-            out.append(Reminder(f"missed:{t.id}:{t.due}", "Missed deadline",
-                                f"{t.title} · was due {fmt.day(t.due, today)}. t resolve to decide.", t.id))
-    for t in getattr(app, "woken", []):
+            out.append(Reminder(f"missed:{t.id}:{r.deadline}", "Missed deadline",
+                                f"{t.title} · was due {fmt.day(r.deadline, today)}. t resolve to decide.", t.id))
+    for t in app.woken_today():
         out.append(Reminder(f"back:{t.id}:{today}", "Back from waiting", t.title, t.id))
     return out
 

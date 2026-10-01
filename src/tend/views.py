@@ -7,7 +7,7 @@ from rich.text import Text
 
 from . import fmt
 from .plan import Plan
-from .ui import ACCENT, DIM, WARN, console
+from .ui import ACCENT, ACCENT_B, DIM, WARN, console
 
 RULE_LABEL = {1: "deadline", 2: "big rock", 3: ""}
 
@@ -47,13 +47,14 @@ def day_plan(plan: Plan, day: date, today: date):
 def warnings(plan: Plan, today: date):
     for late in plan.late:
         t = late.task
-        if t.due < today:
-            msg = f"is past due ({fmt.day(t.due, today)}). t r to decide what to do."
+        if late.due < today:
+            msg = f"is past due ({fmt.day(late.due, today)}). t r to decide what to do."
         elif late.finish is None:
-            msg = (f"doesn't fit before {fmt.day(t.due, today)}: "
+            msg = (f"doesn't fit before {fmt.day(late.due, today)}: "
                    f"{fmt.minutes(late.minutes_left)} of work has no time slot")
         else:
-            msg = f"won't be done by {fmt.day(t.due, today)}: {fmt.minutes(late.minutes_left)} of work lands after it"
+            msg = (f"won't be done by {fmt.day(late.due, today)}: "
+                   f"{fmt.minutes(late.minutes_left)} of work lands after it")
         console.print(f" [{WARN}]⚑ {escape(t.title)} {msg}[/]")
 
 
@@ -100,7 +101,7 @@ def gantt(plan: Plan, days: int, today: date, hours_per_day: float, day_start, d
     head1 = Text(" " + " " * title_w)
     head2 = Text(" " + " " * title_w)
     for d in span:
-        style = f"bold {ACCENT}" if d == today else DIM
+        style = ACCENT_B if d == today else DIM
         head1.append(f"{d:%a}"[: cell - 1].ljust(cell), style)
         head2.append(str(d.day).ljust(cell), style)
     console.print(head1)
@@ -126,13 +127,14 @@ def gantt(plan: Plan, days: int, today: date, hours_per_day: float, day_start, d
             m = sum(b.minutes for b in plan.blocks if b.task.id == t.id and b.start.date() == d)
             n = max(1, round(m / (hours_per_day * 60) * (cell - 1))) if m > 0 else 0
             v = Text("▆" * n, color)
-            if t.due == d:
+            if plan.deadlines.get(t.id) == d:
                 v.append("◆", WARN)
             row.append(v)
         name = t.title if len(t.title) <= title_w - 1 else t.title[: title_w - 2] + "…"
         meta = f"#{t.id}"
-        if t.due and t.due > span[-1]:
-            meta += f" · due {fmt.day(t.due, today)}"
+        due = plan.deadlines.get(t.id)
+        if due and due > span[-1]:
+            meta += f" · due {fmt.day(due, today)}"
         name_text = Text(name.ljust(title_w), "bold" if t.id in late_ids else "")
         console.print(Text(" ") + name_text + cells(row) + Text(meta, DIM))
     if len(order) > max_rows:

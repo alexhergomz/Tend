@@ -8,7 +8,7 @@ from ..model import Task
 from ..registry import command
 from ..ui import ACCENT, DIM, WARN, console
 from . import actions
-from ._shared import goal_hint, ids_in, title
+from ._shared import fresh, goal_hint, ids_in, title
 
 
 @command("add", key="a", group="Capturing", help="capture a task (or just: t <text>)", usage="<text> [details]",
@@ -48,6 +48,8 @@ def cmd_triage(app: App, args):
         return app.bar("next")
     goals = [g.name for g in app.store.goals()]
     for i, t in enumerate(inbox, 1):
+        if not (t := fresh(app, t)):
+            continue
         console.print(f"\n [{DIM}]{i}/{len(inbox)}[/]  {title(t)}")
         v = ui.choose("matters?", {"1": "nice to have", "2": "matters", "3": "really", "k": "drop",
                                    "enter": "later", "q": "stop"})
