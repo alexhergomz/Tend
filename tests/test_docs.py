@@ -8,12 +8,13 @@ from tend import config, features, hooks, manpage, registry
 from tend.store import SCHEMA
 
 ROOT = Path(__file__).parents[1]
-README = (ROOT / "README.md").read_text()
-DATA = (ROOT / "docs" / "data.md").read_text()
+README = (ROOT / "README.md").read_text(encoding="utf-8")
+DATA = (ROOT / "docs" / "data.md").read_text(encoding="utf-8")
 
 
 def test_man_page_is_up_to_date():
-    assert (ROOT / "docs" / "t.1").read_text() == manpage.render(), "run: python -m tend.manpage > docs/t.1"
+    page = (ROOT / "docs" / "t.1").read_text(encoding="utf-8")
+    assert page == manpage.render(), "run: python -m tend.manpage > docs/t.1"
 
 
 def test_readme_lists_every_command_with_its_key():

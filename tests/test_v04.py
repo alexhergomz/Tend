@@ -112,17 +112,17 @@ def test_energy_in_rank_and_plan():
 def _run_t(tmp_path, *args, **kw):
     env = {**os.environ, "TEND_DB": str(tmp_path / "t.db"), "TEND_CONFIG": str(tmp_path / "config.toml"),
            "TEND_HOOKS": str(tmp_path / "hooks"), **kw.pop("env", {})}
-    return subprocess.run([sys.executable, "-m", "tend", *args], env=env, capture_output=True, text=True, **kw)
+    return subprocess.run([sys.executable, "-m", "tend", *args], env=env, capture_output=True, encoding="utf-8", **kw)
 
 
 def _script(folder, name: str, code: str):
     """A small Python program that runs as a hook or plugin: `name` on POSIX, `name.py` on Windows."""
     if sys.platform == "win32":
         path = folder / f"{name}.py"
-        path.write_text(code)
+        path.write_text(code, encoding="utf-8")
     else:
         path = folder / name
-        path.write_text(f"#!{sys.executable}\n{code}")
+        path.write_text(f"#!{sys.executable}\n{code}", encoding="utf-8")
         path.chmod(path.stat().st_mode | stat.S_IEXEC)
     return path
 
@@ -131,14 +131,15 @@ def test_hooks_receive_json(tmp_path):
     hooks = tmp_path / "hooks"
     hooks.mkdir()
     out = tmp_path / "hook.json"
-    _script(hooks, "on_done", f"import sys, pathlib\npathlib.Path({str(out)!r}).write_text(sys.stdin.read())\n")
+    code = f"import sys, pathlib\npathlib.Path({str(out)!r}).write_text(sys.stdin.read(), encoding='utf-8')\n"
+    _script(hooks, "on_done", code)
     _run_t(tmp_path, "write", "report")
     _run_t(tmp_path, "done", "1")
     for _ in range(100):
-        if out.exists() and out.read_text():
+        if out.exists() and out.read_text(encoding="utf-8"):
             break
         time.sleep(0.05)
-    data = json.loads(out.read_text())
+    data = json.loads(out.read_text(encoding="utf-8"))
     assert data["event"] == "on_done" and data["task"]["title"] == "write report"
 
 

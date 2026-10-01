@@ -9,7 +9,7 @@ import sys
 def _t(tmp_path, *args):
     env = {**os.environ, "TEND_DB": str(tmp_path / "t.db"), "TEND_CONFIG": str(tmp_path / "c.toml"),
            "TEND_HOOKS": str(tmp_path / "hooks"), "COLUMNS": "100"}
-    return subprocess.run([sys.executable, "-m", "tend", *args], env=env, capture_output=True, text=True)
+    return subprocess.run([sys.executable, "-m", "tend", *args], env=env, capture_output=True, encoding="utf-8")
 
 
 def test_features_list_and_toggle(tmp_path):
@@ -18,7 +18,7 @@ def test_features_list_and_toggle(tmp_path):
     _t(tmp_path, "features", "off", "states", "planning")
     out = json.loads(_t(tmp_path, "features", "--json").stdout)
     assert not out["states"]["on"] and not out["planning"]["on"] and out["energy"]["on"]
-    assert "states = false" in (tmp_path / "c.toml").read_text()
+    assert "states = false" in (tmp_path / "c.toml").read_text(encoding="utf-8")
 
 
 def test_commands_of_a_disabled_feature_explain_themselves(tmp_path):

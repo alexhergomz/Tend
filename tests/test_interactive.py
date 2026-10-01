@@ -50,7 +50,7 @@ def drive(tmp_path, args, keys, settle=1.5):
 
 def t(tmp_path, *args):
     r = subprocess.run([sys.executable, "-m", "tend", *args, "--json"], env=env(tmp_path),
-                       capture_output=True, text=True)
+                       capture_output=True, encoding="utf-8")
     return json.loads(r.stdout) if r.stdout.strip() else None
 
 

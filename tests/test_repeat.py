@@ -48,7 +48,7 @@ def _t(tmp_path, *args, json_out=True):
     env = {**os.environ, "TEND_DB": str(tmp_path / "t.db"), "TEND_CONFIG": str(tmp_path / "c.toml"),
            "TEND_HOOKS": str(tmp_path / "hooks"), "COLUMNS": "100"}
     r = subprocess.run([sys.executable, "-m", "tend", *args] + (["--json"] if json_out else []),
-                       env=env, capture_output=True, text=True)
+                       env=env, capture_output=True, encoding="utf-8")
     assert r.returncode == 0, r.stdout + r.stderr
     return json.loads(r.stdout) if json_out and r.stdout.strip() else r.stdout
 
@@ -88,7 +88,7 @@ def test_repeat_feature_off_creates_no_copy(tmp_path):
 
 
 def test_notify_sends_each_reminder_once(tmp_path):
-    (tmp_path / "c.toml").write_text('[schedule]\nday_start = "00:00"\nday_end = "23:59"\n')
+    (tmp_path / "c.toml").write_text('[schedule]\nday_start = "00:00"\nday_end = "23:59"\n', encoding="utf-8")
     _t(tmp_path, "tax", "form", "due:tom", "e:3h")
     first = _t(tmp_path, "notify", "--dry-run")
     keys = {r["key"].split(":")[0] for r in first["reminders"]}
@@ -98,7 +98,7 @@ def test_notify_sends_each_reminder_once(tmp_path):
 
 
 def test_notify_is_quiet_outside_the_working_day(tmp_path):
-    (tmp_path / "c.toml").write_text('[schedule]\nday_start = "00:00"\nday_end = "00:01"\n')
+    (tmp_path / "c.toml").write_text('[schedule]\nday_start = "00:00"\nday_end = "00:01"\n', encoding="utf-8")
     _t(tmp_path, "tax", "form", "due:tom")
     out = _t(tmp_path, "notify", json_out=False)
     assert "wait for later" in out

@@ -18,7 +18,8 @@ from tend import __version__
 def run(tmp_path, *args, extra_env=None, stdin=None):
     env = {**os.environ, "TEND_DB": str(tmp_path / "t.db"), "TEND_CONFIG": str(tmp_path / "c.toml"),
            "TEND_HOOKS": str(tmp_path / "hooks"), "COLUMNS": "100", **(extra_env or {})}
-    return subprocess.run([sys.executable, "-m", "tend", *args], env=env, capture_output=True, text=True, input=stdin)
+    return subprocess.run([sys.executable, "-m", "tend", *args], env=env, capture_output=True,
+                          encoding="utf-8", input=stdin)
 
 
 # ── doctor ──────────────────────────────────────────────────────────────
@@ -32,11 +33,11 @@ def test_doctor_on_a_healthy_setup(tmp_path):
 
 
 def test_doctor_finds_problems_and_still_runs_with_a_broken_config(tmp_path):
-    (tmp_path / "c.toml").write_text('[ui]\ncolour = 1\n[schedule]\nday_start = "9am"\n')
+    (tmp_path / "c.toml").write_text('[ui]\ncolour = 1\n[schedule]\nday_start = "9am"\n', encoding="utf-8")
     hooks = tmp_path / "hooks"
     hooks.mkdir()
-    (hooks / "on_finish").write_text("#!/bin/sh\n")
-    (hooks / "on_done").write_text("#!/bin/sh\n")  # not executable
+    (hooks / "on_finish").write_text("#!/bin/sh\n", encoding="utf-8")
+    (hooks / "on_done").write_text("#!/bin/sh\n", encoding="utf-8")  # not executable
     r = run(tmp_path, "doctor", "--json")
     checks = json.loads(r.stdout)
     texts = " ".join(c["text"] for c in checks)
@@ -46,7 +47,7 @@ def test_doctor_finds_problems_and_still_runs_with_a_broken_config(tmp_path):
 
 
 def test_broken_config_gives_a_clear_message(tmp_path):
-    (tmp_path / "c.toml").write_text("[ui\nfooter = true\n")
+    (tmp_path / "c.toml").write_text("[ui\nfooter = true\n", encoding="utf-8")
     r = run(tmp_path, "next")
     assert r.returncode == 2 and "config file has a problem" in r.stdout and "t doctor" in r.stdout
 
@@ -72,7 +73,7 @@ def test_bash_completion_script(tmp_path):
     if not shutil.which("t", path=env["PATH"]):
         pytest.skip("t is not installed on PATH")
     test = script + '\nCOMP_LINE="t add x due:to"; COMP_POINT=${#COMP_LINE}; _tend_complete; echo "${COMPREPLY[*]}"\n'
-    out = subprocess.run(["bash", "-c", test], env=env, capture_output=True, text=True).stdout.strip()
+    out = subprocess.run(["bash", "-c", test], env=env, capture_output=True, encoding="utf-8").stdout.strip()
     assert out == "today tom"
 
 
@@ -84,7 +85,7 @@ def test_completion_scripts_exist_for_three_shells(tmp_path):
 
 # ── themes, help, version ───────────────────────────────────────────────
 def test_plain_theme_is_ascii_only(tmp_path):
-    (tmp_path / "c.toml").write_text('[ui]\ntheme = "plain"\n')
+    (tmp_path / "c.toml").write_text('[ui]\ntheme = "plain"\n', encoding="utf-8")
     run(tmp_path, "tax", "form", "due:tom", "every:month", "v:2", "s:S")
     for cmd in ("next", "ls", "help", "wins", "goals", "features"):
         out = run(tmp_path, cmd, extra_env={"FORCE_COLOR": "1"}).stdout
@@ -93,7 +94,7 @@ def test_plain_theme_is_ascii_only(tmp_path):
 
 
 def test_light_theme_and_no_color(tmp_path):
-    (tmp_path / "c.toml").write_text('[ui]\ntheme = "light"\n')
+    (tmp_path / "c.toml").write_text('[ui]\ntheme = "light"\n', encoding="utf-8")
     run(tmp_path, "something")
     assert run(tmp_path, "next", extra_env={"FORCE_COLOR": "1"}).returncode == 0
     out = run(tmp_path, "next", extra_env={"FORCE_COLOR": "1", "NO_COLOR": "1"}).stdout
@@ -163,6 +164,6 @@ def test_every_style_name_resolves_in_every_theme():
     for path in pathlib.Path(ui.__file__).parent.rglob("*.py"):
         if path.name == "ui.py":  # where the themes are built from colors
             continue
-        text = path.read_text()
+        text = path.read_text(encoding="utf-8")
         assert 'f"bold {' not in text and "f'bold {" not in text, f"{path}: combine styles with a theme name"
 

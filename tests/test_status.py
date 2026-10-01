@@ -47,7 +47,7 @@ def test_state_property():
 def _t(tmp_path, *args):
     env = {**os.environ, "TEND_DB": str(tmp_path / "t.db"), "TEND_CONFIG": str(tmp_path / "c.toml"),
            "TEND_HOOKS": str(tmp_path / "hooks")}
-    r = subprocess.run([sys.executable, "-m", "tend", *args, "--json"], env=env, capture_output=True, text=True)
+    r = subprocess.run([sys.executable, "-m", "tend", *args, "--json"], env=env, capture_output=True, encoding="utf-8")
     assert r.returncode == 0, r.stdout + r.stderr
     return json.loads(r.stdout) if r.stdout.strip() else None
 

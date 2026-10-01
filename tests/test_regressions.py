@@ -20,7 +20,8 @@ TOMORROW = (date.today() + timedelta(days=1)).isoformat()
 def t(tmp_path, *args, stdin=None):
     env = {**os.environ, "TEND_DB": str(tmp_path / "t.db"), "TEND_CONFIG": str(tmp_path / "c.toml"),
            "TEND_HOOKS": str(tmp_path / "hooks"), "COLUMNS": "100"}
-    return subprocess.run([sys.executable, "-m", "tend", *args], env=env, capture_output=True, text=True, input=stdin)
+    return subprocess.run([sys.executable, "-m", "tend", *args], env=env, capture_output=True,
+                          encoding="utf-8", input=stdin)
 
 
 def queue(tmp_path) -> list[dict]:
@@ -188,7 +189,7 @@ def test_feb29_is_the_next_one_that_exists():
 
 
 def test_back_from_waiting_reminder_survives_another_run(tmp_path):
-    (tmp_path / "c.toml").write_text('[schedule]\nday_start = "00:00"\nday_end = "23:59"\n')
+    (tmp_path / "c.toml").write_text('[schedule]\nday_start = "00:00"\nday_end = "23:59"\n', encoding="utf-8")
     t(tmp_path, "reply", "from", "bank")
     t(tmp_path, "wait", "1", "+1d")
     con = sqlite3.connect(tmp_path / "t.db")

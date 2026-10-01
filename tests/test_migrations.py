@@ -29,7 +29,8 @@ def rows(path) -> dict[int, dict]:
 def t(tmp_path, *args, stdin=None):
     env = {**os.environ, "TEND_DB": str(tmp_path / "tend.db"), "TEND_CONFIG": str(tmp_path / "c.toml"),
            "TEND_HOOKS": str(tmp_path / "hooks"), "COLUMNS": "100"}
-    return subprocess.run([sys.executable, "-m", "tend", *args], env=env, capture_output=True, text=True, input=stdin)
+    return subprocess.run([sys.executable, "-m", "tend", *args], env=env, capture_output=True,
+                          encoding="utf-8", input=stdin)
 
 
 def test_there_is_a_fixture_for_every_release():

@@ -41,11 +41,11 @@ def test_windows_hooks_and_plugins(monkeypatch, tmp_path):
     monkeypatch.setattr(hooks, "WINDOWS", True)
     monkeypatch.setenv("PATHEXT", ".COM;.EXE;.BAT;.CMD")
     for name in ("on_done.bat", "on_add.py", "notes.txt"):
-        (tmp_path / name).write_text("x")
+        (tmp_path / name).write_text("x", encoding="utf-8")
     assert hooks.runnable(tmp_path / "on_done.bat") and hooks.runnable(tmp_path / "on_add.py")
     assert not hooks.runnable(tmp_path / "notes.txt")
     assert hooks.command(Path("C:/h/on_add.py"))[0] == sys.executable
     assert hooks.command(Path("C:/h/on_done.bat"))[:2] == ["cmd", "/c"]
-    (tmp_path / "t-hello.py").write_text("print('hi')")
+    (tmp_path / "t-hello.py").write_text("print('hi')", encoding="utf-8")
     monkeypatch.setenv("PATH", str(tmp_path))
     assert hooks.find_plugin("hello") == str(tmp_path / "t-hello.py")
