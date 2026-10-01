@@ -7,6 +7,7 @@ anywhere. A deadline at risk ignores all of this.
 """
 
 from datetime import datetime, time
+from itertools import pairwise
 
 Windows = dict[str, list[tuple[time, time]]]
 
@@ -40,7 +41,7 @@ def split(start: datetime, end: datetime, windows: Windows) -> list[list]:
                 if start < moment < end:
                     cuts.add(moment)
     points = sorted(cuts)
-    return [[a, b, at(windows, a)] for a, b in zip(points, points[1:])]
+    return [[a, b, at(windows, a)] for a, b in pairwise(points)]
 
 
 def allowed(task_energy: str | None, level: str | None, windows: Windows) -> bool:

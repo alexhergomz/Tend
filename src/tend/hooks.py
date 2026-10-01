@@ -13,7 +13,6 @@ change with before/after rows.
 
 import json
 import os
-import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -21,7 +20,7 @@ from . import __version__, config
 
 EVENTS = ("on_add", "on_done", "on_drop", "on_skip", "on_status", "on_focus_start", "on_focus_end",
           "on_review", "on_remind", "on_change")
-_running: list[subprocess.Popen] = []
+_running: list = []  # hooks still running, so they can be reaped
 
 
 def hooks_dir() -> Path:
@@ -40,7 +39,7 @@ def plugin_env() -> dict:
 
 def scripts(event: str) -> list[Path]:
     base = hooks_dir()
-    found = [base / event] + sorted((base / f"{event}.d").glob("*"))
+    found = [base / event, *sorted((base / f"{event}.d").glob("*"))]
     return [p for p in found if p.is_file() and os.access(p, os.X_OK)]
 
 
@@ -51,6 +50,8 @@ def fire(event: str, payload: dict):
     for p in _running[:]:
         if p.poll() is not None:
             _running.remove(p)
+    import subprocess
+
     data = json.dumps({"event": event, "time": datetime.now().isoformat(timespec="seconds"), **payload},
                       default=str).encode()
     log_path = config.data_path().parent / "hooks.log"

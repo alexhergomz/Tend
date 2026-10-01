@@ -11,8 +11,9 @@ change history (events) is only copied in a full replace.
 """
 
 import json
+from collections.abc import Iterable
 from datetime import datetime
-from typing import IO, Iterable
+from typing import IO
 
 from . import __version__
 from .store import VERSION, Store

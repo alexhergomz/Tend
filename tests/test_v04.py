@@ -10,7 +10,8 @@ import time
 from datetime import date, datetime, timedelta
 
 from tend.calibrate import corrections, from_lateness
-from tend.energy import allowed, at, parse as parse_windows, split
+from tend.energy import allowed, at, split
+from tend.energy import parse as parse_windows
 from tend.model import Task
 from tend.plan import schedule
 from tend.priority import rank

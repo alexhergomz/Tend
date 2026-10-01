@@ -11,7 +11,7 @@ import re
 import time
 import urllib.request
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -43,7 +43,7 @@ def _parse_dt(params: dict, value: str) -> datetime | None:
         return None
     dt = datetime.strptime(value.rstrip("Z")[:15], "%Y%m%dT%H%M%S")
     if value.endswith("Z"):
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=UTC)
     if "TZID" in params:
         try:
             return dt.replace(tzinfo=ZoneInfo(params["TZID"].strip('"')))

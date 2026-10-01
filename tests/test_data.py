@@ -14,7 +14,7 @@ from tend import backup, transfer
 from tend.model import Task
 from tend.store import Store
 
-CFG = lambda folder: {"backup": {"keep_days": 3, "folder": str(folder)}}  # noqa: E731
+CFG = lambda folder: {"backup": {"keep_days": 3, "folder": str(folder)}}
 
 
 def seeded(path) -> Store:

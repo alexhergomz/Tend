@@ -67,5 +67,6 @@ def test_all_day_and_cancelled_are_skipped_floating_and_duration_work():
 
 
 def test_folded_lines():
-    text = "BEGIN:VEVENT\r\nSUMMARY:Long\r\n  title\r\nDTSTART:20260929T090000\r\nDTEND:20260929T100000\r\nEND:VEVENT\r\n"
+    text = ("BEGIN:VEVENT\r\nSUMMARY:Long\r\n  title\r\n"
+            "DTSTART:20260929T090000\r\nDTEND:20260929T100000\r\nEND:VEVENT\r\n")
     assert parse(text, START, END)[0].title == "Long title"

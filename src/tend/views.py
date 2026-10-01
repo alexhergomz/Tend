@@ -50,7 +50,8 @@ def warnings(plan: Plan, today: date):
         if t.due < today:
             msg = f"is past due ({fmt.day(t.due, today)}). t r to decide what to do."
         elif late.finish is None:
-            msg = f"doesn't fit before {fmt.day(t.due, today)}: {fmt.minutes(late.minutes_left)} of work has no time slot"
+            msg = (f"doesn't fit before {fmt.day(t.due, today)}: "
+                   f"{fmt.minutes(late.minutes_left)} of work has no time slot")
         else:
             msg = f"won't be done by {fmt.day(t.due, today)}: {fmt.minutes(late.minutes_left)} of work lands after it"
         console.print(f" [{WARN}]⚑ {escape(t.title)} {msg}[/]")
@@ -75,11 +76,18 @@ def summary(plan: Plan, days: int, calibration):
         console.print(f" [{DIM}]From your history: {', '.join(notes)} · t stats[/]")
 
 
+def _busy_hours(events, day, day_start, day_end) -> float:
+    """Hours of calendar events inside the working window of one day."""
+    start, end = datetime.combine(day, day_start), datetime.combine(day, day_end)
+    return sum((min(e.end, end) - max(e.start, start)).total_seconds() / 3600
+               for e in events if e.end > start and e.start < end)
+
+
 def gantt(plan: Plan, days: int, today: date, hours_per_day: float, day_start, day_end, max_rows: int = 15):
     span = plan.days[:days]
     title_w = 22
     cell = max(3, min(6, (console.width - title_w - 18) // days))
-    late_ids = {l.task.id for l in plan.late}
+    late_ids = {late.task.id for late in plan.late}
 
     def cells(values: list[Text]) -> Text:
         out = Text()
@@ -102,9 +110,7 @@ def gantt(plan: Plan, days: int, today: date, hours_per_day: float, day_start, d
     if plan.events:
         busy = []
         for d in span:
-            h = sum((min(e.end, datetime.combine(d, day_end)) - max(e.start, datetime.combine(d, day_start))).total_seconds() / 3600
-                    for e in plan.events if e.start.date() == d and e.end > datetime.combine(d, day_start)
-                    and e.start < datetime.combine(d, day_end))
+            h = _busy_hours(plan.events, d, day_start, day_end)
             n = round(h / window * (cell - 1)) if h > 0 else 0
             busy.append(Text("▃" * max(n, 1 if h > 0 else 0), DIM))
         console.print(Text(" " + "calendar".ljust(title_w), DIM) + cells(busy))
@@ -127,7 +133,8 @@ def gantt(plan: Plan, days: int, today: date, hours_per_day: float, day_start, d
         meta = f"#{t.id}"
         if t.due and t.due > span[-1]:
             meta += f" · due {fmt.day(t.due, today)}"
-        console.print(Text(" ") + Text(name.ljust(title_w), "bold" if t.id in late_ids else "") + cells(row) + Text(meta, DIM))
+        name_text = Text(name.ljust(title_w), "bold" if t.id in late_ids else "")
+        console.print(Text(" ") + name_text + cells(row) + Text(meta, DIM))
     if len(order) > max_rows:
         console.print(f" [{DIM}]+ {len(order) - max_rows} more[/]")
     if not order:

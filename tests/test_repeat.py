@@ -109,5 +109,6 @@ def test_systemd_units_point_at_t(monkeypatch):
     monkeypatch.setenv("TEND_DB", "/data/tend.db")
     units = reminders.systemd_units(15)
     assert "OnCalendar=*:0/15" in units["tend-notify.timer"]
-    assert " notify" in units["tend-notify.service"] and 'Environment="TEND_DB=/data/tend.db"' in units["tend-notify.service"]
+    service = units["tend-notify.service"]
+    assert " notify" in service and 'Environment="TEND_DB=/data/tend.db"' in service
     assert "<integer>900</integer>" in reminders.launchd_plist(15)

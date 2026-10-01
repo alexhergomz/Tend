@@ -61,6 +61,11 @@ CREATE TABLE IF NOT EXISTS events (
     undone  INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
+CREATE INDEX IF NOT EXISTS tasks_status ON tasks (status);
+CREATE INDEX IF NOT EXISTS tasks_done_at ON tasks (done_at);
+CREATE INDEX IF NOT EXISTS tasks_parent ON tasks (parent);
+CREATE INDEX IF NOT EXISTS sessions_task ON sessions (task_id);
+CREATE INDEX IF NOT EXISTS sessions_start ON sessions (start);
 """
 VERSION = 4
 NEW_COLUMNS = {
@@ -103,6 +108,8 @@ class Store:
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
         self._changes: list | None = None
+        self._cache: dict[str | None, list[Task]] = {}  # tasks by status, cleared on every change
+        self.generation = 0  # goes up on every change, for caches built on top
         self.on_event = None  # called as on_event(kind, summary, changes) after each commit
         self._migrate()
 
@@ -137,6 +144,11 @@ class Store:
             self.db.execute("UPDATE tasks SET first_due = ?, first_aim = ?, pushes = ? WHERE id = ?",
                             (f.get("due") or r["due"], f.get("aim") or r["aim"], pushes.get(r["id"], 0), r["id"]))
 
+    def changed(self):
+        """Forget cached tasks. Called after every write; call it after writing to `db` directly."""
+        self._cache.clear()
+        self.generation += 1
+
     # ── events ──────────────────────────────────────────────────────────
     @contextmanager
     def event(self, kind: str, summary: str = ""):
@@ -156,6 +168,7 @@ class Store:
             raise
         finally:
             self._changes = None
+            self.changed()
 
     def _record(self, task_id: int, before: dict | None, after: dict | None):
         if self._changes is None:
@@ -183,15 +196,19 @@ class Store:
                 )
         self.db.execute("UPDATE events SET undone = 1 WHERE id = ?", (row["id"],))
         self.db.commit()
+        self.changed()
         return row["summary"]
 
     # ── tasks ───────────────────────────────────────────────────────────
     def tasks(self, status: str | None = "open") -> list[Task]:
-        if status is None:
-            rows = self.db.execute("SELECT * FROM tasks ORDER BY id")
-        else:
-            rows = self.db.execute("SELECT * FROM tasks WHERE status = ? ORDER BY id", (status,))
-        return [Task.from_row(r) for r in rows]
+        """Tasks with a status (None: all). Cached until the next change: update what you modify."""
+        if status not in self._cache:
+            if status is None:
+                rows = self.db.execute("SELECT * FROM tasks ORDER BY id")
+            else:
+                rows = self.db.execute("SELECT * FROM tasks WHERE status = ? ORDER BY id", (status,))
+            self._cache[status] = [Task.from_row(r) for r in rows]
+        return list(self._cache[status])
 
     def task(self, task_id: int) -> Task | None:
         row = self.db.execute("SELECT * FROM tasks WHERE id = ?", (task_id,)).fetchone()
@@ -203,8 +220,7 @@ class Store:
 
     def blocked_ids(self) -> set[int]:
         """Tasks that were split: they wait for their open children."""
-        rows = self.db.execute("SELECT DISTINCT parent FROM tasks WHERE parent IS NOT NULL AND status = 'open'")
-        return {r[0] for r in rows}
+        return {t.parent for t in self.tasks() if t.parent is not None}
 
     def insert(self, t: Task) -> int:
         if not t.created:
@@ -218,6 +234,7 @@ class Store:
         )
         t.id = cur.lastrowid
         self._record(t.id, None, t.to_row())
+        self.changed()
         return t.id
 
     def update(self, t: Task):
@@ -231,14 +248,17 @@ class Store:
                 t.pushes += 1
         row = t.to_row()
         cols = [c for c in COLS if c != "id"]
-        self.db.execute(f"UPDATE tasks SET {','.join(c + ' = ?' for c in cols)} WHERE id = ?", [row[c] for c in cols] + [t.id])
+        assignments = ",".join(f"{c} = ?" for c in cols)
+        self.db.execute(f"UPDATE tasks SET {assignments} WHERE id = ?", [*(row[c] for c in cols), t.id])
         self._record(t.id, before, row)
+        self.changed()
 
     def mark(self, kind: str, summary: str):
         """A history entry with no task changes, such as an import."""
         self.db.execute("INSERT INTO events (ts, kind, summary, changes) VALUES (?, ?, ?, '[]')",
                         (now_iso(), kind, summary))
         self.db.commit()
+        self.changed()
 
     def done_since(self, since: date) -> list[Task]:
         rows = self.db.execute(
@@ -254,6 +274,7 @@ class Store:
     def ensure_goal(self, name: str) -> bool:
         cur = self.db.execute("INSERT OR IGNORE INTO goals (name, created) VALUES (?, ?)", (name, now_iso()))
         self.db.commit()
+        self.changed()
         return cur.rowcount == 1
 
     def set_goal(self, name: str, weekly_min: int, why: str | None):
@@ -264,10 +285,12 @@ class Store:
             (name, weekly_min, why, now_iso()),
         )
         self.db.commit()
+        self.changed()
 
     def delete_goal(self, name: str) -> bool:
         cur = self.db.execute("DELETE FROM goals WHERE name = ?", (name,))
         self.db.commit()
+        self.changed()
         return cur.rowcount == 1
 
     def goal_minutes(self, since: date) -> dict[str, float]:
@@ -296,6 +319,7 @@ class Store:
             (task_id, start.isoformat(timespec="seconds"), end.isoformat(timespec="seconds"), mode, minutes),
         )
         self.db.commit()
+        self.changed()
 
     def logged_by_task(self) -> dict[int, float]:
         return {r[0]: r[1] for r in self.db.execute("SELECT task_id, SUM(minutes) FROM sessions GROUP BY task_id")}
@@ -310,5 +334,6 @@ class Store:
         return row[0] if row else None
 
     def set_meta(self, key: str, value):
-        self.db.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", (key, None if value is None else str(value)))
+        self.db.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)",
+                        (key, None if value is None else str(value)))
         self.db.commit()

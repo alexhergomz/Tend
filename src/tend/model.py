@@ -6,7 +6,7 @@ SIZE_MINUTES = {"S": 30, "M": 120, "L": 240}  # assumed effort when no estimate 
 DATE_FIELDS = ("due", "aim", "start_after", "skip_date", "first_due", "first_aim")
 ENERGY = ("high", "low")
 STAGES = ("todo", "started", "waiting")  # where an open task is
-STATES = STAGES + ("done", "dropped")  # what people see: stage while open, else status
+STATES = (*STAGES, "done", "dropped")  # what people see: stage while open, else status
 
 
 @dataclass
@@ -53,7 +53,7 @@ class Task:
 
     @classmethod
     def from_row(cls, row) -> "Task":
-        data = {f.name: row[f.name] for f in fields(cls)}
+        data = {name: row[name] for name in _NAMES}
         for k in DATE_FIELDS:
             if data[k]:
                 data[k] = date.fromisoformat(data[k])
@@ -61,6 +61,9 @@ class Task:
 
     def to_json(self) -> dict:
         return self.to_row()
+
+
+_NAMES = tuple(f.name for f in fields(Task))
 
 
 @dataclass

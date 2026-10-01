@@ -6,21 +6,24 @@ help lines and effects on ranking and planning are all gone.
 
 import re
 
-from . import config
+from . import config, registry
 
-# name: (since version, what it does, commands it adds)
+# name: (since version, what it does). Commands name their feature in the registry.
 FEATURES = {
-    "review": ("0.2", "weekly review and its reminder", ["review"]),
-    "learning": ("0.2", "corrections learned from your history, and t stats", ["stats"]),
-    "planning": ("0.3", "t plan, t gantt and calendar import", ["plan", "gantt"]),
-    "hooks": ("0.4", "scripts that run after events", []),
-    "plugins": ("0.4", "t-<name> programs run as t <name>", ["plugins"]),
-    "energy": ("0.5", "energy windows and @high / @low tasks", []),
-    "states": ("0.6", "started and waiting states", ["start", "wait", "status"]),
-    "repeat": ("0.8", "repeating tasks (every:mon)", []),
-    "reminders": ("0.8", "desktop reminders from a timer", ["notify"]),
+    "review": ("0.2", "weekly review and its reminder"),
+    "learning": ("0.2", "corrections learned from your history, and t stats"),
+    "planning": ("0.3", "t plan, t gantt and calendar import"),
+    "hooks": ("0.4", "scripts that run after events"),
+    "plugins": ("0.4", "t-<name> programs run as t <name>"),
+    "energy": ("0.5", "energy windows and @high / @low tasks"),
+    "states": ("0.6", "started and waiting states"),
+    "repeat": ("0.8", "repeating tasks (every:mon)"),
+    "reminders": ("0.8", "desktop reminders from a timer"),
 }
-OWNER = {cmd: name for name, (_, _, cmds) in FEATURES.items() for cmd in cmds}
+
+
+def commands_of(name: str) -> list[str]:
+    return [c.name for c in registry.COMMANDS.values() if c.feature == name and not c.hidden]
 
 
 def enabled(cfg: dict, name: str) -> bool:
@@ -31,8 +34,8 @@ def enabled(cfg: dict, name: str) -> bool:
 
 
 def command_enabled(cfg: dict, command: str) -> bool:
-    owner = OWNER.get(command)
-    return owner is None or enabled(cfg, owner)
+    cmd = registry.COMMANDS.get(command)
+    return cmd is None or cmd.feature is None or enabled(cfg, cmd.feature)
 
 
 def set_enabled(name: str, on: bool):
@@ -40,7 +43,7 @@ def set_enabled(name: str, on: bool):
     path = config.config_path()
     lines = path.read_text().splitlines() if path.exists() else []
     value = "true" if on else "false"
-    header = next((i for i, l in enumerate(lines) if re.match(r"\s*\[features\]", l)), None)
+    header = next((i for i, line in enumerate(lines) if re.match(r"\s*\[features\]", line)), None)
     if header is None:
         lines += ["", "[features]", f"{name} = {value}"]
     else:

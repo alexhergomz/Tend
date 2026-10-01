@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from . import fmt, priority
+from . import fmt
 
 SENT_KEY = "reminders_sent"
 KEEP_DAYS = 30

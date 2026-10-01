@@ -47,7 +47,8 @@ class Plan:
         return [b for b in self.blocks if b.start.date() == day]
 
 
-def free_slots(day: date, day_start: time, day_end: time, events: list[Event], not_before: datetime) -> list[list[datetime]]:
+def free_slots(day: date, day_start: time, day_end: time, events: list[Event],
+               not_before: datetime) -> list[list[datetime]]:
     start = max(datetime.combine(day, day_start), not_before)
     end = datetime.combine(day, day_end)
     slots = [[start, end]] if start < end else []

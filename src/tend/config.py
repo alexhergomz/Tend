@@ -2,6 +2,7 @@
 
 import os
 import tomllib
+from datetime import time
 from pathlib import Path
 
 DEFAULTS = {
@@ -41,6 +42,7 @@ DEFAULTS = {
     },
     "ui": {
         "footer": True,  # command bar under every output
+        "theme": "dark",  # dark | light | plain
     },
     "backup": {
         "keep_days": 7,  # daily copies to keep
@@ -93,6 +95,7 @@ quiet_rollovers = 2       # a missed soft target rolls forward quietly this many
 
 [ui]
 footer = true             # show the command bar under every output
+theme = "dark"            # dark | light | plain (no color, ASCII only)
 
 [backup]
 keep_days = 7             # a copy of your data is made every day; this many are kept
@@ -127,16 +130,109 @@ def data_path() -> Path:
     return Path(os.environ.get("TEND_DB") or _xdg("XDG_DATA_HOME", ".local/share") / "tend" / "tend.db")
 
 
-def load() -> dict:
+class ConfigError(Exception):
+    """The config file can't be used. The message says where and why."""
+
+
+def read_user() -> dict:
+    """The user's config file as written, without defaults. Creates it on first run."""
     path = config_path()
     if not path.exists():
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(TEMPLATE)
         except OSError:
-            pass
-    user = {}
-    if path.exists():
+            return {}
+    try:
         with path.open("rb") as f:
-            user = tomllib.load(f)
+            return tomllib.load(f)
+    except tomllib.TOMLDecodeError as e:
+        raise ConfigError(f"{path}: {e}") from None
+    except OSError as e:
+        raise ConfigError(f"can't read {path}: {e.strerror}") from None
+
+
+def merge(user: dict) -> dict:
     return {section: {**values, **user.get(section, {})} for section, values in DEFAULTS.items()}
+
+
+def load() -> dict:
+    cfg = merge(read_user())
+    errors, _ = check(cfg, {})
+    if errors:
+        raise ConfigError(f"{config_path()}: {errors[0]}")
+    return cfg
+
+
+# ── checks ──────────────────────────────────────────────────────────────
+def _time(value) -> time | None:
+    try:
+        return time.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def check(cfg: dict, user: dict) -> tuple[list[str], list[str]]:
+    """(errors, warnings). Errors stop Tend; warnings are for `t doctor`."""
+    errors, warnings = [], []
+
+    for section, values in user.items():
+        if section not in DEFAULTS:
+            warnings.append(f"unknown section [{section}]")
+            continue
+        if isinstance(values, dict):
+            for key in values:
+                if key not in DEFAULTS[section]:
+                    warnings.append(f"unknown setting {key} in [{section}]")
+
+    for section, values in DEFAULTS.items():
+        for key, default in values.items():
+            value = cfg[section][key]
+            if isinstance(default, bool):
+                ok, want = isinstance(value, bool), "true or false"
+            elif isinstance(default, (int, float)):
+                ok, want = isinstance(value, (int, float)) and not isinstance(value, bool), "a number"
+            else:
+                ok, want = isinstance(value, type(default)), "a list" if isinstance(default, list) else "text in quotes"
+            if not ok:
+                errors.append(f"{key} in [{section}] should be {want}, not {value!r}")
+    if errors:
+        return errors, warnings
+
+    def need(cond, msg):
+        if not cond:
+            errors.append(msg)
+
+    f, p, sc = cfg["focus"], cfg["priority"], cfg["schedule"]
+    need(f["default_mode"] in ("pomo", "flow", "box"), "default_mode in [focus] should be pomo, flow or box")
+    for k in ("pomo_work", "pomo_break", "box_minutes"):
+        need(f[k] > 0, f"{k} in [focus] should be more than 0")
+    need(0 < f["flow_break_ratio"] <= 1, "flow_break_ratio in [focus] should be between 0 and 1")
+    need(0 < p["hours_per_day"] <= 24, "hours_per_day in [priority] should be between 0 and 24")
+    need(p["at_risk_slack_days"] >= 0, "at_risk_slack_days in [priority] can't be negative")
+    need(p["max_started"] >= 1, "max_started in [priority] should be 1 or more")
+    start, end = _time(sc["day_start"]), _time(sc["day_end"])
+    need(start is not None, f"day_start in [schedule] should be a time like 09:00, not {sc['day_start']!r}")
+    need(end is not None, f"day_end in [schedule] should be a time like 18:00, not {sc['day_end']!r}")
+    if start and end:
+        need(start < end, "day_start in [schedule] should be before day_end")
+    days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+    bad = [d for d in sc["work_days"] if not isinstance(d, str) or d.lower()[:3] not in days]
+    not_days = f" (not {bad})" if bad else ""
+    need(not bad and sc["work_days"], f"work_days in [schedule] should be day names like mon, tue{not_days}")
+    need(sc["max_block"] >= 15, "max_block in [schedule] should be 15 minutes or more")
+    need(sc["break_minutes"] >= 0, "break_minutes in [schedule] can't be negative")
+    need(1 <= sc["horizon_days"] <= 90, "horizon_days in [schedule] should be between 1 and 90")
+    need(all(isinstance(x, str) for x in cfg["calendar"]["ics"]), "ics in [calendar] should be a list of paths or URLs")
+    need(cfg["review"]["every_days"] >= 1, "every_days in [review] should be 1 or more")
+    for level in ("high", "low"):
+        for span in cfg["energy"][level]:
+            a, _, b = str(span).partition("-")
+            ta, tb = _time(a.strip()), _time(b.strip())
+            need(ta is not None and tb is not None and ta < tb,
+                 f"{span!r} in {level} [energy] should look like \"09:00-12:00\"")
+    need(cfg["slips"]["quiet_rollovers"] >= 0, "quiet_rollovers in [slips] can't be negative")
+    need(cfg["ui"]["theme"] in ("dark", "light", "plain"), "theme in [ui] should be dark, light or plain")
+    need(cfg["backup"]["keep_days"] >= 1, "keep_days in [backup] should be 1 or more")
+    need(1 <= cfg["reminders"]["every_minutes"] <= 60, "every_minutes in [reminders] should be between 1 and 60")
+    return errors, warnings

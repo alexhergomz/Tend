@@ -2,7 +2,7 @@ from datetime import date
 
 
 def minutes(m: float) -> str:
-    m = int(round(m))
+    m = round(m)
     if m < 60:
         return f"{m}m"
     h, r = divmod(m, 60)

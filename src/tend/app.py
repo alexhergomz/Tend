@@ -1,15 +1,15 @@
+"""The state of one run of Tend: config, data, today's date, and output helpers."""
+
 import json
+import sys
+from dataclasses import replace
 from datetime import date, datetime, time, timedelta
 
-from dataclasses import replace
-
-import sys
-
-from . import backup, calibrate, config, energy, features, hooks, ics, plan, priority, slips, ui
+from . import backup, calibrate, config, energy, features, hooks, priority, slips, ui
 from .model import Task
 from .store import Store
 
-# Footer keys for each context. "t" (triage) and "r" (resolve) are added when relevant.
+# Keys in the command bar for each screen. Alerts (resolve, triage, review) are added when they apply.
 FOOTERS = {
     "next": ["f", "d", "b", "s", "x", "h", "a"],
     "added": ["n", "a", "u"],
@@ -20,29 +20,33 @@ FOOTERS = {
     "plan": ["n", "c", "f"],
     "stats": ["n", "p"],
 }
+DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
 
 class UsageError(Exception):
-    pass
+    """A mistake in how a command was used. Shown as one friendly line."""
 
 
 class App:
     def __init__(self, json_out: bool = False, tui: bool = False):
         self.cfg = config.load()
+        ui.apply_theme(self.cfg["ui"]["theme"])
         self.store = Store(config.data_path())
         self.json = json_out
         self.tui = tui
-        self.flash: list[str] = []
+        self.flash: list[str] = []  # messages for the next interactive screen
         self.nested = False  # inside another command (review): no command bar
         self.energy_override: str | None = None  # t next --low / --high
+        self._ranked: tuple | None = None
         self.store.on_event = self._on_change
         try:
             backup.daily(self.store.db, self.cfg, date.today())
-        except OSError as e:  # a failed backup must never stop you from using tend
+        except OSError as e:  # a failed backup must never stop you from using Tend
             print(f"Tend: daily backup failed: {e}", file=sys.stderr)
         self.reload()
 
     def reload(self):
+        """Start of a run, or of a new screen: apply what the date changes."""
         self.today = date.today()
         self.__dict__.pop("_corrections", None)
         slips.roll_over(self.store, self.today, self.cfg["slips"]["quiet_rollovers"])
@@ -52,6 +56,7 @@ class App:
     def week_start(self) -> date:
         return self.today - timedelta(days=self.today.weekday())
 
+    # ── features and hooks ──────────────────────────────────────────────
     def on(self, feature: str) -> bool:
         return features.enabled(self.cfg, feature)
 
@@ -63,26 +68,20 @@ class App:
         if self.on("hooks"):
             hooks.fire(event, {"task": task.to_json() if task else None, **extra})
 
+    # ── what the engines see ────────────────────────────────────────────
     def open_tasks(self) -> list[Task]:
         """Open tasks as the engines and screens should see them: features that are off leave no trace."""
         tasks = self.store.tasks()
+        off = {f: None for f, name in (("energy", "energy"), ("repeat", "repeat")) if not self.on(name)}
         if not self.on("states"):
-            tasks = [replace(t, stage="todo") for t in tasks]
-        if not self.on("energy"):
-            tasks = [replace(t, energy=None) for t in tasks]
-        if not self.on("repeat"):
-            tasks = [replace(t, repeat=None) for t in tasks]
-        return tasks
+            off["stage"] = "todo"
+        return [replace(t, **off) for t in tasks] if off else tasks
 
     @property
     def corrections(self) -> calibrate.Corrections:
-        if not hasattr(self, "_corrections"):
+        if "_corrections" not in self.__dict__:
             self._corrections = calibrate.corrections(self.store, self.on("learning"))
         return self._corrections
-
-    @property
-    def calibration(self) -> calibrate.Calibration:
-        return self.corrections.time
 
     @property
     def windows(self) -> energy.Windows:
@@ -95,39 +94,46 @@ class App:
         """Everything the three rules need, besides the tasks and the date."""
         targets = {g.name: g.weekly_min for g in self.store.goals()}
         today_min = self.store.goal_minutes(self.today)
-        p = self.cfg["priority"]
+        c = self.corrections
         return dict(
             goal_targets=targets,
             goal_minutes=self.store.goal_minutes(self.week_start),
             goal_worked_today=any(today_min.get(g, 0) > 0 for g, t in targets.items() if t > 0),
             logged=self.store.logged_by_task(),
             blocked=self.store.blocked_ids(),
-            at_risk_days=p["at_risk_slack_days"],
-            calibration=self.corrections.time.factor,
-            hard_shift=self.corrections.hard.days,
-            soft_shift=self.corrections.soft.days,
+            at_risk_days=self.cfg["priority"]["at_risk_slack_days"],
+            calibration=c.time.factor,
+            hard_shift=c.hard.days,
+            soft_shift=c.soft.days,
         )
 
     def ranked(self) -> list[priority.Ranked]:
-        return priority.rank(self.open_tasks(), today=self.today, energy_now=self.energy_now(),
-                             hours_per_day=self.cfg["priority"]["hours_per_day"], **self.rank_inputs())
+        """The queue. Built once per change of the data."""
+        key = (self.store.generation, self.today, self.energy_now())
+        if not self._ranked or self._ranked[0] != key:
+            result = priority.rank(self.open_tasks(), today=self.today, energy_now=key[2],
+                                   hours_per_day=self.cfg["priority"]["hours_per_day"], **self.rank_inputs())
+            self._ranked = (key, result)
+        return list(self._ranked[1])
 
     def schedule_times(self) -> tuple[time, time]:
         sc = self.cfg["schedule"]
         return time.fromisoformat(sc["day_start"]), time.fromisoformat(sc["day_end"])
 
-    def build_plan(self, days: int | None = None) -> tuple[plan.Plan, list[str]]:
+    def build_plan(self, days: int | None = None):
+        from . import ics, plan  # only needed here
+
         sc = self.cfg["schedule"]
         horizon = max(days or 0, sc["horizon_days"])
         start = datetime.combine(self.today, time())
-        events, warnings = ics.load(self.cfg["calendar"]["ics"] if self.on("planning") else [], config.data_path().parent / "calendars",
+        sources = self.cfg["calendar"]["ics"] if self.on("planning") else []
+        events, warnings = ics.load(sources, config.data_path().parent / "calendars",
                                     start, start + timedelta(days=horizon))
         day_start, day_end = self.schedule_times()
-        names = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
-        work_days = {names.index(d.lower()[:3]) for d in sc["work_days"] if d.lower()[:3] in names}
         result = plan.schedule(
             self.open_tasks(), events, now=datetime.now(), days=horizon,
-            day_start=day_start, day_end=day_end, work_days=work_days,
+            day_start=day_start, day_end=day_end,
+            work_days={DAYS.index(d.lower()[:3]) for d in sc["work_days"] if d.lower()[:3] in DAYS},
             hours_per_day=self.cfg["priority"]["hours_per_day"],
             focused_today=self.store.focused_since(self.today),
             max_block=sc["max_block"], break_minutes=sc["break_minutes"],
@@ -135,6 +141,7 @@ class App:
         )
         return result, warnings
 
+    # ── status ──────────────────────────────────────────────────────────
     def review_due(self) -> bool:
         if not self.on("review"):
             return False
@@ -149,24 +156,30 @@ class App:
 
     def status(self, ranked=None) -> dict:
         ranked = self.ranked() if ranked is None else ranked
-        open_tasks = self.store.tasks()
+        tasks = self.store.tasks()
+        blocked = self.store.blocked_ids()
+        started = sum(1 for t in tasks if t.stage == "started" and t.id not in blocked)
         return {
             "at_risk": sum(1 for r in ranked if r.rule == 1 and r.task.due >= self.today),
             "slipped": len(self.slipped()),
-            "inbox": sum(1 for t in open_tasks if not t.triaged),
+            "inbox": sum(1 for t in tasks if not t.triaged),
             "review": self.review_due(),
-            "started": (started := sum(1 for t in open_tasks if t.stage == "started"
-                                       and t.id not in self.store.blocked_ids())),
+            "started": started,
             "too_many_started": self.on("states") and started > self.cfg["priority"]["max_started"],
         }
 
-    def footer_keys(self, ctx: str, counts: dict) -> list[str]:
-        """Base keys for the context, with alerts after the first three so they survive trimming."""
-        base = list(FOOTERS[ctx])
+    def footer_keys(self, screen: str, counts: dict) -> list[str]:
+        """Keys for a screen, with alerts after the first three so they survive trimming."""
+        base = list(FOOTERS[screen])
         alerts = [k for k, on in (("r", counts["slipped"]), ("t", counts["inbox"]), ("v", counts.get("review")))
                   if on and k not in base]
         keys = base[:3] + alerts + base[3:] + ["?"]
-        return [k for k in keys if features.command_enabled(self.cfg, ui.LABELS.get(k, ""))]
+        return [k for k in keys if features.command_enabled(self.cfg, ui.label(k))]
+
+    def first_run(self) -> bool:
+        """No task was ever added: show the welcome instead of an empty screen."""
+        return self.store.get_meta("welcomed") is None and not self.store.db.execute(
+            "SELECT 1 FROM tasks LIMIT 1").fetchone()
 
     # ── output ──────────────────────────────────────────────────────────
     def say(self, msg: str):
@@ -178,16 +191,16 @@ class App:
     def emit(self, obj):
         print(json.dumps(obj, indent=2, default=str))
 
-    def bar(self, ctx: str):
-        """Status line + command bar, printed under every CLI output."""
+    def bar(self, screen: str):
+        """Status line and command bar, printed under every command's output."""
         if self.tui or self.json or self.nested or not self.cfg["ui"]["footer"]:
             return
         counts = self.status()
         ui.console.print()
         ui.status_line(counts)
-        ui.footer(self.footer_keys(ctx, counts))
+        ui.footer(self.footer_keys(screen, counts))
 
-    # ── targets ─────────────────────────────────────────────────────────
+    # ── which task ──────────────────────────────────────────────────────
     def target(self, args: list[str]) -> Task | None:
         """Explicit id, else the task last shown by `next`, else the top of the queue."""
         ids = [a.lstrip("#") for a in args if a.lstrip("#").isdigit()]

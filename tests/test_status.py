@@ -87,7 +87,8 @@ def test_migration_marks_tasks_with_focus_time_as_started(tmp_path):
         CREATE TABLE sessions (id INTEGER PRIMARY KEY, task_id INTEGER, start TEXT NOT NULL,
             end TEXT NOT NULL, mode TEXT NOT NULL, minutes REAL NOT NULL);
         INSERT INTO tasks (id, title, created) VALUES (1, 'worked on', '2026-09-01'), (2, 'not yet', '2026-09-01');
-        INSERT INTO sessions (task_id, start, end, mode, minutes) VALUES (1, '2026-09-20T10:00:00', '2026-09-20T10:25:00', 'pomo', 25);
+        INSERT INTO sessions (task_id, start, end, mode, minutes)
+            VALUES (1, '2026-09-20T10:00:00', '2026-09-20T10:25:00', 'pomo', 25);
     """)
     con.commit()
     con.close()
