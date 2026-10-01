@@ -37,9 +37,13 @@ COMMANDS = [
     ("w", "wins", "what you got done today  (--week)"),
     ("i", "stats", "how your plans usually go: time, dates, push-backs"),
     ("u", "undo", "undo the last change"),
+    ("", "backup", "save a copy of your data now (one is made every day)"),
+    ("", "restore", "list copies, or go back to one:  t restore 2"),
+    ("", "export", "all data as JSON lines:  t export tasks.jsonl"),
+    ("", "import", "load an export  (--replace for an exact copy)"),
     ("?", "help", "this list"),
 ]
-LABELS = {k: name for k, name, _ in COMMANDS} | {"q": "quit"}
+LABELS = {k: name for k, name, _ in COMMANDS if k} | {"q": "quit"}
 
 
 def say(msg: str):

@@ -38,3 +38,7 @@ def days(n: float) -> str:
     n = round(n, 1)
     n = int(n) if n == int(n) else n
     return f"{n} day" if n == 1 else f"{n} days"
+
+
+def count(n: int, word: str) -> str:
+    return f"{n} {word}" if n == 1 else f"{n} {word}s"

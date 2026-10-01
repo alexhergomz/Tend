@@ -3,7 +3,9 @@ from datetime import date, datetime, time, timedelta
 
 from dataclasses import replace
 
-from . import calibrate, config, energy, features, hooks, ics, plan, priority, slips, ui
+import sys
+
+from . import backup, calibrate, config, energy, features, hooks, ics, plan, priority, slips, ui
 from .model import Task
 from .store import Store
 
@@ -34,6 +36,10 @@ class App:
         self.nested = False  # inside another command (review): no command bar
         self.energy_override: str | None = None  # t next --low / --high
         self.store.on_event = self._on_change
+        try:
+            backup.daily(self.store.db, self.cfg, date.today())
+        except OSError as e:  # a failed backup must never stop you from using tend
+            print(f"tend: daily backup failed: {e}", file=sys.stderr)
         self.reload()
 
     def reload(self):

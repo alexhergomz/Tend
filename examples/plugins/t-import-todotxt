@@ -1,0 +1,78 @@
+#!/usr/bin/env python3
+"""t import-todotxt: import a todo.txt file (http://todotxt.org).
+
+Usage:  t import-todotxt todo.txt [done.txt ...]    --dry-run prints the export instead
+
+  x                 → done (with its completion date)
+  (A) (B) (C+)      → value 3, 2, 1. No priority: the task goes to the inbox.
+  +project          → goal (the first one)
+  due:YYYY-MM-DD    → hard deadline        t:YYYY-MM-DD → hidden until that date
+  @context, other key:value → removed from the title
+
+It builds a tend export and pipes it to `t import -`, so running it twice adds nothing twice.
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+from datetime import datetime
+
+DATE = r"\d{4}-\d{2}-\d{2}"
+
+
+def parse(line: str, n: int, fallback_created: str) -> dict | None:
+    line = line.strip()
+    if not line:
+        return None
+    done = completed = None
+    if m := re.match(rf"x (?:({DATE}) )?", line):
+        done, completed, line = True, m[1], line[m.end():]
+    value = None
+    if m := re.match(r"\(([A-Z])\) ", line):
+        value, line = {"A": 3, "B": 2}.get(m[1], 1), line[m.end():]
+    created = fallback_created
+    if m := re.match(rf"({DATE}) ", line):
+        created, line = f"{m[1]}T00:00:00", line[m.end():]
+    words, goal, due, start = [], None, None, None
+    for w in line.split():
+        if w.startswith("+") and len(w) > 1:
+            goal = goal or re.sub(r"[^\w-]", "-", w[1:].lower())
+        elif w.startswith("@") and len(w) > 1:
+            continue
+        elif m := re.fullmatch(rf"due:({DATE})", w):
+            due = m[1]
+        elif m := re.fullmatch(rf"t:({DATE})", w):
+            start = m[1]
+        elif re.fullmatch(r"[a-z]+:\S+", w) and not w.startswith(("http:", "https:")):
+            continue
+        else:
+            words.append(w)
+    return {"id": n, "title": " ".join(words) or line, "goal": goal, "value": value, "due": due,
+            "first_due": due, "start_after": start, "status": "done" if done else "open",
+            "done_at": f"{completed}T00:00:00" if completed else (created if done else None), "created": created}
+
+
+def main():
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    if not args:
+        sys.exit(__doc__)
+    tasks = []
+    for path in args:
+        stamp = datetime.fromtimestamp(os.path.getmtime(path)).isoformat(timespec="seconds")
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                if row := parse(line, len(tasks) + 1, stamp):
+                    tasks.append(row)
+    goals = sorted({t["goal"] for t in tasks if t["goal"]})
+    lines = [json.dumps({"format": "tend-export", "format_version": 1, "schema": 3})]
+    lines += [json.dumps({"table": "goals", "row": {"name": g, "weekly_min": 0, "created": tasks[0]["created"]}})
+              for g in goals]
+    lines += [json.dumps({"table": "tasks", "row": t}) for t in tasks]
+    export = "\n".join(lines) + "\n"
+    if "--dry-run" in sys.argv:
+        return print(export, end="")
+    sys.exit(subprocess.run(["t", "import", "-"], input=export, text=True).returncode)
+
+
+main()

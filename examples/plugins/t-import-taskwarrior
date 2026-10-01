@@ -1,0 +1,63 @@
+#!/usr/bin/env python3
+"""t import-taskwarrior: import tasks from Taskwarrior.
+
+Usage:  task export > tasks.json && t import-taskwarrior tasks.json    (--dry-run prints the export)
+
+  project → goal       priority H/M/L → value 3/2/1      due → hard deadline
+  scheduled → hidden until that date    wait → waiting until that date
+  completed → done     deleted → dropped    recurring templates are skipped
+
+It builds a tend export and pipes it to `t import -`, so running it twice adds nothing twice.
+"""
+import json
+import re
+import subprocess
+import sys
+from datetime import datetime, timezone
+
+
+def when(value: str | None, as_date: bool = False) -> str | None:
+    if not value:
+        return None
+    dt = datetime.strptime(value, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc).astimezone()
+    return dt.date().isoformat() if as_date else dt.replace(tzinfo=None).isoformat(timespec="seconds")
+
+
+def convert(item: dict, n: int) -> dict | None:
+    status = item.get("status")
+    if status == "recurring":
+        return None
+    project = item.get("project")
+    due = when(item.get("due"), as_date=True)
+    row = {
+        "id": n, "title": item["description"], "created": when(item.get("entry")) or "2000-01-01T00:00:00",
+        "goal": re.sub(r"[^\w-]", "-", project.lower()) if project else None,
+        "value": {"H": 3, "M": 2, "L": 1}.get(item.get("priority")),
+        "due": due, "first_due": due, "start_after": when(item.get("scheduled"), as_date=True),
+        "status": {"completed": "done", "deleted": "dropped"}.get(status, "open"),
+        "done_at": when(item.get("end")) if status in ("completed", "deleted") else None,
+    }
+    if status == "waiting" or (item.get("wait") and status == "pending"):
+        row["stage"], row["start_after"] = "waiting", when(item.get("wait"), as_date=True)
+    return row
+
+
+def main():
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    if not args:
+        sys.exit(__doc__)
+    text = open(args[0], encoding="utf-8").read().strip()
+    items = json.loads(text) if text.startswith("[") else [json.loads(l) for l in text.splitlines() if l.strip()]
+    tasks = [row for row in (convert(it, i + 1) for i, it in enumerate(items)) if row]
+    goals = sorted({t["goal"] for t in tasks if t["goal"]})
+    lines = [json.dumps({"format": "tend-export", "format_version": 1, "schema": 3})]
+    lines += [json.dumps({"table": "goals", "row": {"name": g, "weekly_min": 0, "created": "2000-01-01T00:00:00"}})
+              for g in goals]
+    lines += [json.dumps({"table": "tasks", "row": t}) for t in tasks]
+    export = "\n".join(lines) + "\n"
+    if "--dry-run" in sys.argv:
+        return print(export, end="")
+    sys.exit(subprocess.run(["t", "import", "-"], input=export, text=True).returncode)
+
+
+main()

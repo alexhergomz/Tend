@@ -27,22 +27,9 @@
 | 0.5 | Energy windows | `energy` |
 | 0.6 | Task states: todo, started, waiting | `states` |
 | 0.6 | Feature switches (`t features`) | core |
-
-## 0.7: Your data, safe and portable
-
-People must trust tend with their tasks before they rely on it.
-
-- **Backups (core).** One copy of the database per day, kept for 7 days, made
-  automatically on the first run of the day. `t backup` makes one now.
-  `t restore` lists the copies and restores one.
-- **Export and import (core).** `t export` writes every task, goal, session and
-  event as JSON lines. `t import` reads that format back. Together they allow a
-  full move to another machine without SQLite tools.
-- **Importers as plugins.** `t-import-todotxt`, `t-import-taskwarrior` and
-  `t-import-csv` in `examples/plugins/`. Each one is a small script that
-  calls `t add` and `t edit`, so it also serves as a plugin example.
-- **Data reference.** `docs/data.md` describes every table and column, the JSON
-  output, the hook payloads and the plugin environment, with a version number.
+| 0.7 | Daily backups, `t backup`, `t restore` | core |
+| 0.7 | `t export`, `t import`, data reference (`docs/data.md`) | core |
+| 0.7 | Importers for todo.txt, Taskwarrior and CSV | plugins in `examples/` |
 
 ## 0.8: Repeating tasks and reminders
 

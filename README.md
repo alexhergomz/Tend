@@ -344,6 +344,10 @@ mode (`t` with no arguments), you only press the letter.
 | `u` | `undo` | Undo the last change |
 | `?` | `help` | Show all commands and the syntax |
 | | `features` | Turn optional parts on and off: `t features off states` |
+| | `backup` | Save a copy of your data now |
+| | `restore` | List copies, or go back to one: `t restore 2` |
+| | `export` | Write all data as JSON lines |
+| | `import` | Load an export: `t import tasks.jsonl` |
 
 In zsh, `?` is a wildcard, so use `t help` on the command line. In interactive
 mode, `?` works as a key.
@@ -481,6 +485,57 @@ sqlite3 ~/.local/share/tend/tend.db \
   "SELECT goal, SUM(minutes) FROM sessions JOIN tasks ON tasks.id = task_id GROUP BY goal"
 ```
 
+[docs/data.md](docs/data.md) describes every column, every JSON output, the
+export format, hook payloads and the plugin environment.
+
+### Backups
+
+tend copies your data **every day**, the first time you use it that day. It
+keeps the last 7 daily copies. It also saves a copy before every restore and
+every import. Copies are made with SQLite's backup function, so they are never
+half-written.
+
+```sh
+t backup            # save a copy now (the last 10 are kept)
+t restore           # list all copies, newest first
+t restore 2         # go back to copy 2. Your current data is saved first.
+```
+
+To keep copies somewhere else, for example in a synced folder, set
+`folder` in the `[backup]` section of the config.
+
+### Export and import
+
+```sh
+t export tasks.jsonl          # everything: tasks, goals, sessions, history
+t export > tasks.jsonl        # the same, to stdout
+t import tasks.jsonl          # add the tasks to what you have
+t import tasks.jsonl --replace --yes   # make an exact copy instead
+```
+
+- **Into an empty database,** an import is an exact copy, ids and history
+  included. Use this to move tend to another computer.
+- **Into a database with tasks,** an import adds them as new tasks. Ids are
+  renumbered, split tasks stay linked, and goals are matched by name. A task with
+  the same title and creation time as one you have is skipped, so importing the
+  same file twice adds nothing twice.
+- `--replace` swaps all your data for the file. It asks first, or needs `--yes`.
+- A copy of your data is saved before every import. To undo one, use `t restore 1`.
+
+### Moving from another app
+
+Three importer plugins are in `examples/plugins/`. Copy them to a folder on your
+PATH, then:
+
+| From | Command | Maps |
+|---|---|---|
+| todo.txt | `t import-todotxt todo.txt done.txt` | `(A)` to value 3, `+project` to goal, `due:`, `t:`, done tasks |
+| Taskwarrior | `task export > tw.json && t import-taskwarrior tw.json` | project, priority, due, scheduled, wait, completed, deleted |
+| CSV | `t import-csv tasks.csv` | columns `title`, `goal`, `due`, `aim`, `value`, `size`, `estimate`, `status` |
+
+Each one converts the file to tend's export format and passes it to `t import`.
+Add `--dry-run` to see the converted data without importing it.
+
 ## Configuration
 
 The config file is `~/.config/tend/config.toml`. tend creates it on first run,
@@ -517,6 +572,10 @@ every_days = 7
 [energy]
 high = []                 # e.g. ["09:00-12:00"]
 low = []                  # e.g. ["14:00-16:00"]
+
+[backup]
+keep_days = 7             # daily copies to keep
+folder = ""               # empty: next to the database
 
 [features]                # false removes a part completely
 review = true
@@ -555,6 +614,7 @@ The code is small and split by job:
 | `energy.py` | Energy windows |
 | `hooks.py` | Hooks and plugin lookup |
 | `features.py` | Feature switches |
+| `backup.py`, `transfer.py` | Backups, export and import |
 | `store.py` | SQLite schema, events and undo |
 | `parse.py` | Syntax for tasks, dates and durations |
 | `commands.py` | One function per command |
@@ -568,8 +628,7 @@ ffmpeg.
 
 | Version | What |
 |---|---|
-| 0.1 to 0.6 | Done: the core, review, learning, planning, hooks, plugins, energy, states |
-| 0.7 | Backups, export and import, a data reference |
+| 0.1 to 0.7 | Done: the core, review, learning, planning, hooks, plugins, energy, states, backups, export and import |
 | 0.8 | Repeating tasks and reminders |
 | 0.9 | First-run guide, shell completion, themes, `t doctor` |
 | 1.0 | Stable data and plugin interfaces, PyPI release |

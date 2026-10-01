@@ -1,12 +1,15 @@
+import sys
 from datetime import datetime, timedelta
+from pathlib import Path
 
 from rich.markup import escape
 from rich.padding import Padding
 from rich.text import Text
 
-from . import config, features, fmt, hooks, keys, parse, slips, ui, views
+from . import backup, config, features, fmt, hooks, keys, parse, slips, transfer, ui, views
 from . import focus as focus_timer
 from .app import App, UsageError
+from .store import UndoBlocked
 from .model import STATES, Task
 from .store import now_iso
 from .ui import ACCENT, DIM, WARN, console
@@ -313,7 +316,11 @@ def cmd_drop(app: App, args):
 
 
 def cmd_undo(app: App, args):
-    summary = app.store.undo()
+    try:
+        summary = app.store.undo()
+    except UndoBlocked as e:
+        raise UsageError(f"The last change was an import or a restore, which undo can't reverse. "
+                         f"To go back: t restore (copy 1 is from just before it)") from None
     app.say(f" [{ACCENT}]↶[/] undid: {escape(summary)}" if summary else f" [{DIM}]Nothing to undo.[/]")
     app.bar("next")
 
@@ -742,6 +749,110 @@ def cmd_features(app: App, args):
     app.bar("stats")
 
 
+# ── your data ───────────────────────────────────────────────────────────
+def cmd_backup(app: App, args):
+    path = backup.make(app.store.db, app.cfg, "manual")
+    if app.json:
+        return app.emit({"path": str(path)})
+    app.say(f" [{ACCENT}]✓[/] saved a copy [{DIM}]{escape(str(path))}[/]")
+    app.say(f" [{DIM}]t restore lists every copy.[/]")
+
+
+def _confirm(app: App, question: str, args) -> bool:
+    if "--yes" in args or "-y" in args:
+        return True
+    if not keys.interactive():
+        raise UsageError(f"{question} Add --yes to confirm.")
+    return ui.choose(question, {"y": "yes", "n": "no"}) == "y"
+
+
+def cmd_restore(app: App, args):
+    found = backup.copies(app.cfg)
+    picks = [a for a in args if a.isdigit()]
+    if not picks:
+        if app.json:
+            return app.emit([{"n": i, "path": str(c.path), "kind": c.kind, "made": c.made,
+                              "open_tasks": c.open_tasks()} for i, c in enumerate(found, 1)])
+        if not found:
+            return app.say(f" [{DIM}]No copies yet. One is made every day you use tend, or now with[/] t backup")
+        console.print(f" [bold]Copies of your data[/] [{DIM}]· newest first · {escape(str(backup.folder(app.cfg)))}[/]")
+        for i, c in enumerate(found, 1):
+            n = c.open_tasks()
+            tasks = f"{n} open tasks" if n is not None else "can't be read"
+            console.print(f"  [bold {ACCENT}]{i:>2}[/]  {c.made:%a %b %d %H:%M}  [{DIM}]{c.kind:<7} {tasks} · {c.size_kb} KB[/]")
+        console.print(f"\n [{DIM}]t restore <number> goes back to a copy. Your current data is saved first.[/]")
+        return
+    n = int(picks[0])
+    if not 1 <= n <= len(found):
+        raise UsageError(f"no copy {n}. t restore lists them.")
+    chosen = found[n - 1]
+    if not _confirm(app, f"Replace your current data with the copy from {chosen.made:%a %b %d %H:%M}?", args):
+        return app.say(f" [{DIM}]Nothing changed.[/]")
+    try:
+        before = backup.restore(app.store.db, app.cfg, chosen.path)
+    except ValueError as e:
+        raise UsageError(str(e)) from None
+    app.store.mark("restore", f"restored the copy from {chosen.made:%Y-%m-%d %H:%M}")
+    if app.json:
+        return app.emit({"restored": str(chosen.path), "saved_first": str(before)})
+    app.say(f" [{ACCENT}]✓[/] restored the copy from {chosen.made:%a %b %d %H:%M}")
+    app.say(f" [{DIM}]Your data from before is saved too. To go back: t restore 1[/]")
+    app.bar("next")
+
+
+def cmd_export(app: App, args):
+    files = [a for a in args if not a.startswith("-")]
+    if not files or files[0] == "-":
+        transfer.export(app.store, sys.stdout)  # data only: nothing else on stdout
+        return
+    path = Path(files[0]).expanduser()
+    with path.open("w", encoding="utf-8") as f:
+        counts = transfer.export(app.store, f)
+    if app.json:
+        return app.emit({"path": str(path), **counts})
+    app.say(f" [{ACCENT}]✓[/] exported {fmt.count(counts['tasks'], 'task')}, {fmt.count(counts['goals'], 'goal')}, "
+            f"{fmt.count(counts['sessions'], 'focus session')} and {fmt.count(counts['events'], 'change')} "
+            f"[{DIM}]→ {escape(str(path))}[/]")
+
+
+def cmd_import(app: App, args):
+    files = [a for a in args if not a.startswith("-") or a == "-"]
+    if not files:
+        raise UsageError("usage: t import <file> [--replace]   (- reads from stdin)")
+    try:
+        if files[0] == "-":
+            header, data = transfer.read(sys.stdin)
+        else:
+            with Path(files[0]).expanduser().open(encoding="utf-8") as f:
+                header, data = transfer.read(f)
+    except OSError as e:
+        raise UsageError(f"can't read {files[0]}: {e.strerror}") from None
+    except transfer.TransferError as e:
+        raise UsageError(str(e)) from None
+    has_tasks = any(app.store.db.execute(f"SELECT 1 FROM {t} LIMIT 1").fetchone() for t in ("tasks", "goals", "sessions"))
+    replace = "--replace" in args or not has_tasks  # an empty database becomes an exact copy
+    if replace and has_tasks and not _confirm(app, "Replace ALL your current data with this file?", args):
+        return app.say(f" [{DIM}]Nothing changed.[/]")
+    saved = backup.make(app.store.db, app.cfg, "before") if has_tasks else None
+    if replace:
+        counts = transfer.replace_all(app.store, header, data)
+        msg = (f"loaded {fmt.count(counts['tasks'], 'task')}, {fmt.count(counts['goals'], 'goal')} "
+               f"and {fmt.count(counts['sessions'], 'focus session')}")
+    else:
+        counts = transfer.add(app.store, data)
+        msg = (f"added {fmt.count(counts['tasks'], 'task')}, {fmt.count(counts['goals'], 'goal')} "
+               f"and {fmt.count(counts['sessions'], 'focus session')}")
+        if counts["skipped"]:
+            msg += f" · {counts['skipped']} already here, skipped"
+    app.store.mark("import", f"import from {files[0]}")
+    if app.json:
+        return app.emit({"mode": "replace" if replace else "add", **counts, "saved_first": str(saved) if saved else None})
+    app.say(f" [{ACCENT}]✓[/] {msg}")
+    if saved:
+        app.say(f" [{DIM}]Your data from before is saved. To go back: t restore 1[/]")
+    app.bar("next")
+
+
 def cmd_help(app: App, args):
     ui.help_screen(config.config_path(), config.data_path(),
                    lambda name: features.command_enabled(app.cfg, name), app.on("plugins") or app.on("hooks"))
@@ -753,9 +864,10 @@ COMMANDS = {
     "start": cmd_start, "wait": cmd_wait, "status": cmd_status,
     "resolve": cmd_resolve, "plan": cmd_plan, "gantt": cmd_gantt, "review": cmd_review,
     "goals": cmd_goals, "wins": cmd_wins, "stats": cmd_stats, "plugins": cmd_plugins, "features": cmd_features,
+    "backup": cmd_backup, "restore": cmd_restore, "export": cmd_export, "import": cmd_import,
     "undo": cmd_undo, "help": cmd_help,
 }
-ALIASES = {k: name for k, name, _ in ui.COMMANDS} | {"list": "ls", "goal": "goals", "log": "wins"}
+ALIASES = {k: name for k, name, _ in ui.COMMANDS if k} | {"list": "ls", "goal": "goals", "log": "wins"}
 
 
 def lookup(word: str, app: App | None = None):

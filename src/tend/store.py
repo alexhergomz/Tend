@@ -78,7 +78,12 @@ COLS = [
     "start_after", "status", "slips", "skip_date", "created", "done_at",
     "energy", "first_due", "first_aim", "pushes", "stage", "started_at",
 ]
-NOT_UNDOABLE = ("rollover",)
+NOT_UNDOABLE = ("rollover",)  # automatic changes, skipped by undo
+BARRIERS = ("import", "restore")  # undo stops here: these are undone with t restore
+
+
+class UndoBlocked(Exception):
+    pass
 
 
 def now_iso() -> str:
@@ -160,6 +165,8 @@ class Store:
         ).fetchone()
         if not row:
             return None
+        if row["kind"] in BARRIERS:
+            raise UndoBlocked(row["kind"])
         for ch in reversed(json.loads(row["changes"])):
             if ch["before"] is None:
                 self.db.execute("DELETE FROM tasks WHERE id = ?", (ch["id"],))
@@ -221,6 +228,12 @@ class Store:
         cols = [c for c in COLS if c != "id"]
         self.db.execute(f"UPDATE tasks SET {','.join(c + ' = ?' for c in cols)} WHERE id = ?", [row[c] for c in cols] + [t.id])
         self._record(t.id, before, row)
+
+    def mark(self, kind: str, summary: str):
+        """A history entry with no task changes, such as an import."""
+        self.db.execute("INSERT INTO events (ts, kind, summary, changes) VALUES (?, ?, ?, '[]')",
+                        (now_iso(), kind, summary))
+        self.db.commit()
 
     def done_since(self, since: date) -> list[Task]:
         rows = self.db.execute(

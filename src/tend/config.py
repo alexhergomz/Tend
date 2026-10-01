@@ -42,6 +42,10 @@ DEFAULTS = {
     "ui": {
         "footer": True,  # command bar under every output
     },
+    "backup": {
+        "keep_days": 7,  # daily copies to keep
+        "folder": "",  # empty: next to the database
+    },
     "features": {name: True for name in ("review", "learning", "planning", "hooks", "plugins", "energy", "states")},
 }
 
@@ -84,6 +88,10 @@ quiet_rollovers = 2       # a missed soft target rolls forward quietly this many
 
 [ui]
 footer = true             # show the command bar under every output
+
+[backup]
+keep_days = 7             # a copy of your data is made every day; this many are kept
+folder = ""               # where copies go; empty means next to the database
 
 [features]                # optional parts of tend; false removes a part completely
 review = true             # weekly review and its reminder
