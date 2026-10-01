@@ -1,6 +1,6 @@
 # Data reference
 
-**Version 1.0** · database schema 4 · export format 1 · Tend 1.0
+**Version 1.0** · database schema 4 · export format 1 · Tend 1.1
 
 This page describes everything a plugin, hook or script can rely on: the
 database, the JSON output, the export format, hook payloads and the plugin
@@ -152,8 +152,9 @@ use them as a starting point for your own.
 
 ## Plugins
 
-A program named `t-<name>` on your PATH runs as `t <name>`. It gets the
-arguments, and these environment variables:
+A program named `t-<name>` on your PATH runs as `t <name>`. On Windows it can
+also be `t-<name>.exe`, `.bat`, `.cmd` or `.py`; a `.py` plugin runs with Tend's
+own Python. It gets the arguments, and these environment variables:
 
 | Variable | Value |
 |---|---|
@@ -166,7 +167,9 @@ If you type `--json`, it is passed on to the plugin.
 ## Hooks
 
 An executable file in `~/.config/tend/hooks/` named after an event, or any
-executable file in `hooks/<event>.d/`. It gets the same environment as plugins,
+executable file in `hooks/<event>.d/`. On Windows the folder is
+`%APPDATA%\tend\hooks\`, and a hook is a `.exe`, `.bat`, `.cmd` or `.py` file
+such as `on_done.py`. It gets the same environment as plugins,
 and one JSON object on stdin:
 
 ```json

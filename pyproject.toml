@@ -1,6 +1,6 @@
 [project]
 name = "tend-cli"
-version = "1.0.0"
+version = "1.1.0"
 description = "A calm task manager for the terminal: one task at a time, and why"
 readme = "README.md"
 requires-python = ">=3.11"

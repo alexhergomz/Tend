@@ -4,6 +4,22 @@ All notable changes to Tend. The format follows [Keep a Changelog](https://keepa
 and versions follow [Semantic Versioning](https://semver.org). From 1.0 on, the
 interfaces listed under "Stability" in the README only change in a new major version.
 
+## 1.1.0 · 2026-10-01
+
+### Added
+- Windows support. Interactive mode, the focus timer and prompts read keys through the
+  Windows console. Settings live in `%APPDATA%\tend`, data in `%LOCALAPPDATA%\tend`.
+- Reminders on Windows: notifications through PowerShell, and `t notify --install`
+  adds a Task Scheduler task that runs without a window.
+- Hooks and plugins on Windows can be `.exe`, `.bat`, `.cmd` or `.py` files.
+- Tests run on Linux, macOS and Windows with Python 3.11 to 3.13 on every push.
+
+### Fixed
+- Bash completion works with bash 3.2, the version that comes with macOS.
+- Files are read and written as UTF-8 everywhere, and piped input and output are
+  UTF-8, so titles with accents or emoji survive an export and import on Windows.
+- `t help` and `t doctor` show paths in your home folder as `~`.
+
 ## 1.0.0 · 2026-10-01
 
 The first stable release. No new commands: this release makes Tend ready to rely on.
@@ -14,6 +30,7 @@ The first stable release. No new commands: this release makes Tend ready to rely
 - Man page (`docs/t.1`), made from the same source as `t help`.
 - Tests that open a database made by every earlier release and check that nothing is lost.
 - Packaged for PyPI as `tend-cli` (the command is still `t`).
+- MIT license.
 
 ### Changed
 - The data reference is version 1.0.

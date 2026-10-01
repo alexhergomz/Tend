@@ -40,6 +40,7 @@ release follows, what each version added, and how new ideas get in.
 | 0.8 | Reminders (`t notify`, timer install, `on_remind` hook) | `reminders` |
 | 0.9 | First-run guide, shell completion, themes, `t doctor`, speed | core |
 | 1.0 | Stability promise, migration tests for every release, man page, PyPI | core |
+| 1.1 | Windows support | core |
 
 The [changelog](CHANGELOG.md) has the details of each version.
 

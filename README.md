@@ -78,7 +78,7 @@ Other design choices:
 
 ## Install
 
-You need Python 3.11 or newer, on Linux or macOS.
+You need Python 3.11 or newer, on Linux, macOS or Windows.
 
 ```sh
 pipx install tend-cli          # or: uv tool install tend-cli
@@ -103,6 +103,12 @@ t completion fish > ~/.config/fish/completions/t.fish
 
 **Man page:** `man ./docs/t.1` from the source folder, or copy `docs/t.1` to
 `~/.local/share/man/man1/`.
+
+**On Windows,** use Windows Terminal for the best look; in an older console the
+`plain` theme is easier to read. Settings are in `%APPDATA%\tend\config.toml` and
+your data in `%LOCALAPPDATA%\tend\tend.db`. Reminders use Windows notifications
+and Task Scheduler. Hooks and plugins can be `.exe`, `.bat`, `.cmd` or `.py` files.
+Shell completion is for bash (including Git Bash), zsh and fish.
 
 ## Quick start
 
@@ -381,7 +387,7 @@ reminders wait until the day starts. Tend never runs in the background by
 itself. To check every 15 minutes, install a timer:
 
 ```sh
-t notify --install     # systemd user timer on Linux, launchd agent on macOS
+t notify --install     # systemd user timer (Linux), launchd agent (macOS), Task Scheduler (Windows)
 t notify --test        # send a test reminder
 t notify --dry-run     # show what would be sent, without sending
 t notify --uninstall
@@ -614,7 +620,8 @@ write them in any language.
 
 ### Plugins
 
-Any program named `t-<name>` on your PATH runs as `t <name>`. It gets the
+Any program named `t-<name>` on your PATH runs as `t <name>` (on Windows also
+`t-<name>.bat`, `.cmd`, `.exe` or `.py`). It gets the
 arguments you typed, plus `TEND_DB` (the database), `TEND_CONFIG` (the settings
 file) and `TEND_VERSION`. A plugin can read data with any command's `--json`
 output, or with SQL. A plugin can't replace a built-in command. `t plugins`
@@ -631,7 +638,9 @@ Examples in `examples/plugins/`:
 
 ### Hooks
 
-A hook is an executable file in `~/.config/tend/hooks/`, named after an event.
+A hook is an executable file in `~/.config/tend/hooks/`, named after an event
+(on Windows: `%APPDATA%\tend\hooks\`, with a `.bat`, `.cmd`, `.exe` or `.py` file
+such as `on_done.py`).
 To run several hooks for one event, put them in a folder instead, such as
 `hooks/on_done.d/`.
 
@@ -762,8 +771,8 @@ uv run pytest            # about 160 tests, including old databases and a real t
 uv run ruff check src tests
 ```
 
-The same checks run on GitHub for Linux and macOS, with Python 3.11, 3.12 and 3.13,
-on every push.
+The same checks run on GitHub for Linux, macOS and Windows, with Python 3.11, 3.12
+and 3.13, on every push.
 
 | Where | What |
 |---|---|
