@@ -20,11 +20,11 @@ def main(argv: list[str] | None = None):
             if keys.interactive() and not json_out:
                 return tui.run(App(tui=True))
             argv = ["next"]
-        fn = commands.lookup(argv[0])
-        if not fn and (plugin := hooks.find_plugin(argv[0])):
+        app = App(json_out=json_out)
+        fn = commands.lookup(argv[0], app)
+        if not fn and app.on("plugins") and (plugin := hooks.find_plugin(argv[0])):
             args = argv[1:] + (["--json"] if json_out else [])
             sys.exit(subprocess.run([plugin, *args], env=hooks.plugin_env()).returncode)
-        app = App(json_out=json_out)
         if fn:
             fn(app, argv[1:])
         else:

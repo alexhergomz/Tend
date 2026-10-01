@@ -1,7 +1,9 @@
 import json
 from datetime import date, datetime, time, timedelta
 
-from . import calibrate, config, energy, hooks, ics, plan, priority, slips, ui
+from dataclasses import replace
+
+from . import calibrate, config, energy, features, hooks, ics, plan, priority, slips, ui
 from .model import Task
 from .store import Store
 
@@ -44,16 +46,30 @@ class App:
     def week_start(self) -> date:
         return self.today - timedelta(days=self.today.weekday())
 
+    def on(self, feature: str) -> bool:
+        return features.enabled(self.cfg, feature)
+
     def _on_change(self, kind: str, summary: str, changes: list):
-        hooks.fire("on_change", {"kind": kind, "summary": summary, "changes": changes})
+        if self.on("hooks"):
+            hooks.fire("on_change", {"kind": kind, "summary": summary, "changes": changes})
 
     def hook(self, event: str, task: Task | None = None, **extra):
-        hooks.fire(event, {"task": task.to_json() if task else None, **extra})
+        if self.on("hooks"):
+            hooks.fire(event, {"task": task.to_json() if task else None, **extra})
+
+    def open_tasks(self) -> list[Task]:
+        """Open tasks as the engines and screens should see them: features that are off leave no trace."""
+        tasks = self.store.tasks()
+        if not self.on("states"):
+            tasks = [replace(t, stage="todo") for t in tasks]
+        if not self.on("energy"):
+            tasks = [replace(t, energy=None) for t in tasks]
+        return tasks
 
     @property
     def corrections(self) -> calibrate.Corrections:
         if not hasattr(self, "_corrections"):
-            self._corrections = calibrate.corrections(self.store, self.cfg["priority"]["calibrate"])
+            self._corrections = calibrate.corrections(self.store, self.on("learning"))
         return self._corrections
 
     @property
@@ -62,7 +78,7 @@ class App:
 
     @property
     def windows(self) -> energy.Windows:
-        return energy.parse(self.cfg["energy"])
+        return energy.parse(self.cfg["energy"]) if self.on("energy") else {}
 
     def energy_now(self) -> str | None:
         return self.energy_override or energy.at(self.windows, datetime.now())
@@ -85,7 +101,7 @@ class App:
         )
 
     def ranked(self) -> list[priority.Ranked]:
-        return priority.rank(self.store.tasks(), today=self.today, energy_now=self.energy_now(),
+        return priority.rank(self.open_tasks(), today=self.today, energy_now=self.energy_now(),
                              hours_per_day=self.cfg["priority"]["hours_per_day"], **self.rank_inputs())
 
     def schedule_times(self) -> tuple[time, time]:
@@ -96,13 +112,13 @@ class App:
         sc = self.cfg["schedule"]
         horizon = max(days or 0, sc["horizon_days"])
         start = datetime.combine(self.today, time())
-        events, warnings = ics.load(self.cfg["calendar"]["ics"], config.data_path().parent / "calendars",
+        events, warnings = ics.load(self.cfg["calendar"]["ics"] if self.on("planning") else [], config.data_path().parent / "calendars",
                                     start, start + timedelta(days=horizon))
         day_start, day_end = self.schedule_times()
         names = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
         work_days = {names.index(d.lower()[:3]) for d in sc["work_days"] if d.lower()[:3] in names}
         result = plan.schedule(
-            self.store.tasks(), events, now=datetime.now(), days=horizon,
+            self.open_tasks(), events, now=datetime.now(), days=horizon,
             day_start=day_start, day_end=day_end, work_days=work_days,
             hours_per_day=self.cfg["priority"]["hours_per_day"],
             focused_today=self.store.focused_since(self.today),
@@ -112,6 +128,8 @@ class App:
         return result, warnings
 
     def review_due(self) -> bool:
+        if not self.on("review"):
+            return False
         last = self.store.get_meta("last_review")
         if last is None:
             self.store.set_meta("last_review", self.today.isoformat())
@@ -131,7 +149,7 @@ class App:
             "review": self.review_due(),
             "started": (started := sum(1 for t in open_tasks if t.stage == "started"
                                        and t.id not in self.store.blocked_ids())),
-            "too_many_started": started > self.cfg["priority"]["max_started"],
+            "too_many_started": self.on("states") and started > self.cfg["priority"]["max_started"],
         }
 
     def footer_keys(self, ctx: str, counts: dict) -> list[str]:
@@ -139,7 +157,8 @@ class App:
         base = list(FOOTERS[ctx])
         alerts = [k for k, on in (("r", counts["slipped"]), ("t", counts["inbox"]), ("v", counts.get("review")))
                   if on and k not in base]
-        return base[:3] + alerts + base[3:] + ["?"]
+        keys = base[:3] + alerts + base[3:] + ["?"]
+        return [k for k in keys if features.command_enabled(self.cfg, ui.LABELS.get(k, ""))]
 
     # ── output ──────────────────────────────────────────────────────────
     def say(self, msg: str):

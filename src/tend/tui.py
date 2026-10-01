@@ -43,7 +43,7 @@ def _loop(app: App):
         if k in ("q", "esc"):
             console.clear()
             return
-        fn = commands.lookup(k)
+        fn = commands.lookup(k, app)
         if not fn:
             continue
         try:

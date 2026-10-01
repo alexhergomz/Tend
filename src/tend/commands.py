@@ -4,7 +4,7 @@ from rich.markup import escape
 from rich.padding import Padding
 from rich.text import Text
 
-from . import config, fmt, hooks, keys, parse, slips, ui, views
+from . import config, features, fmt, hooks, keys, parse, slips, ui, views
 from . import focus as focus_timer
 from .app import App, UsageError
 from .model import STATES, Task
@@ -64,7 +64,7 @@ def cmd_focus(app: App, args):
         return app.say(f" [{DIM}]Nothing to focus on.[/]")
     if not keys.interactive():
         raise UsageError("focus needs an interactive terminal")
-    if t.stage != "started":
+    if app.on("states") and t.stage != "started":
         _set_stage(app, t, "started", quiet=True)
     start = datetime.now()
     app.hook("on_focus_start", t, mode=mode)
@@ -425,7 +425,7 @@ def cmd_ls(app: App, args):
         return app.bar("empty")
     ui.queue(ranked, app.today)
     waiting = [t for t in app.store.tasks() if t.stage == "waiting" and t.id not in {r.task.id for r in ranked}]
-    if waiting:
+    if waiting and app.on("states"):
         console.print(f"\n [bold]Waiting[/] [{DIM}]· not in the queue · t start <id> brings one back[/]")
         for t in waiting:
             console.print(Text("   ") + Text(t.title) + Text("  ") + ui.meta(t, app.today))
@@ -567,7 +567,10 @@ def _review(app: App, since):
             console.print(f"   {mark} {escape(g.name)} [{DIM}]{fmt.minutes(m)} of {fmt.minutes(g.weekly_min)}[/]")
 
     step(2, "How your plans usually go")
-    _corrections(app, indent="   ")
+    if app.on("learning"):
+        _corrections(app, indent="   ")
+    else:
+        console.print(f"   [{DIM}]The learning feature is off.[/]")
 
     def offer(n, title, count, fn, what):
         step(n, title)
@@ -587,7 +590,7 @@ def _review(app: App, since):
         return
 
     step(5, "Waiting")
-    waiting = [t for t in app.store.tasks() if t.stage == "waiting" and not t.start_after]
+    waiting = [t for t in app.store.tasks() if t.stage == "waiting" and not t.start_after and app.on("states")]
     if not waiting:
         console.print(f"   [{DIM}]No task is waiting without a date.[/]")
     for t in waiting:
@@ -714,8 +717,34 @@ def cmd_plugins(app: App, args):
         console.print(f"   [{DIM}]none · events: {', '.join(hooks.EVENTS)}[/]")
 
 
+def cmd_features(app: App, args):
+    if len(args) >= 2 and args[0] in ("on", "off"):
+        for name in args[1:]:
+            if name not in features.FEATURES:
+                raise UsageError(f"no feature '{name}'. Features: {', '.join(features.FEATURES)}")
+            features.set_enabled(name, args[0] == "on")
+        app.cfg = config.load()
+        app.say(f" [{ACCENT}]✓[/] {' '.join(args[1:])} turned {args[0]}")
+    elif args:
+        raise UsageError("usage: t features [on|off <name>...]")
+    if app.json:
+        return app.emit({n: {"on": app.on(n), "since": v, "what": w, "commands": c}
+                         for n, (v, w, c) in features.FEATURES.items()})
+    console.print(f" [bold]Features[/] [{DIM}]· the core is always on · t features off <name> removes a part[/]")
+    from rich.table import Table
+    tbl = Table.grid(padding=(0, 2))
+    for name, (since, what, cmds) in features.FEATURES.items():
+        on = app.on(name)
+        state = f"[{ACCENT}]on[/]" if on else f"[{DIM}]off[/]"
+        tbl.add_row(f"  {state}", f"[bold]{name}[/]" if on else f"[{DIM}]{name}[/]", f"[{DIM}]{since}[/]",
+                    what if on else f"[{DIM}]{what}[/]", f"[{DIM}]{', '.join('t ' + c for c in cmds)}[/]")
+    console.print(tbl)
+    app.bar("stats")
+
+
 def cmd_help(app: App, args):
-    ui.help_screen(config.config_path(), config.data_path())
+    ui.help_screen(config.config_path(), config.data_path(),
+                   lambda name: features.command_enabled(app.cfg, name), app.on("plugins") or app.on("hooks"))
 
 
 COMMANDS = {
@@ -723,11 +752,20 @@ COMMANDS = {
     "add": cmd_add, "triage": cmd_triage, "ls": cmd_ls, "edit": cmd_edit, "drop": cmd_drop,
     "start": cmd_start, "wait": cmd_wait, "status": cmd_status,
     "resolve": cmd_resolve, "plan": cmd_plan, "gantt": cmd_gantt, "review": cmd_review,
-    "goals": cmd_goals, "wins": cmd_wins, "stats": cmd_stats, "plugins": cmd_plugins,
+    "goals": cmd_goals, "wins": cmd_wins, "stats": cmd_stats, "plugins": cmd_plugins, "features": cmd_features,
     "undo": cmd_undo, "help": cmd_help,
 }
 ALIASES = {k: name for k, name, _ in ui.COMMANDS} | {"list": "ls", "goal": "goals", "log": "wins"}
 
 
-def lookup(word: str):
-    return COMMANDS.get(ALIASES.get(word, word))
+def lookup(word: str, app: App | None = None):
+    """The command for a name or key. Commands of a feature that is off explain how to turn it on."""
+    name = ALIASES.get(word, word)
+    fn = COMMANDS.get(name)
+    if fn and app and not features.command_enabled(app.cfg, name):
+        feature = features.OWNER[name]
+
+        def off(app, args):
+            raise UsageError(f"t {name} is part of '{feature}', which is turned off. Turn it on: t features on {feature}")
+        return off
+    return fn

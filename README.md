@@ -343,6 +343,10 @@ mode (`t` with no arguments), you only press the letter.
 | | `plugins` | List installed plugins and hooks |
 | `u` | `undo` | Undo the last change |
 | `?` | `help` | Show all commands and the syntax |
+| | `features` | Turn optional parts on and off: `t features off states` |
+
+In zsh, `?` is a wildcard, so use `t help` on the command line. In interactive
+mode, `?` works as a key.
 
 Without an id, `done`, `skip`, `split`, `edit`, `drop` and `focus` act on the
 task that `next` showed last.
@@ -368,6 +372,37 @@ clear a date.
 
 `!2` and `~45m` also work, but zsh changes them before tend can read them.
 Use them only inside quotes.
+
+## Turning features off
+
+The core of tend is always on: capture, triage, the three rules, the focus
+timer, split, skip, slipped tasks, goals, wins, undo and JSON. Everything added
+after 0.1 is a **feature** you can turn off, like a plugin you don't install.
+
+```sh
+t features                  # list features and whether they are on
+t features off states energy
+t features on states
+```
+
+| Feature | Since | What it adds |
+|---|---|---|
+| `review` | 0.2 | weekly review and its reminder (`t review`) |
+| `learning` | 0.2 | corrections learned from your history (`t stats`) |
+| `planning` | 0.3 | `t plan`, `t gantt` and calendar import |
+| `hooks` | 0.4 | scripts that run after events |
+| `plugins` | 0.4 | `t-<name>` programs run as `t <name>` |
+| `energy` | 0.5 | energy windows and `@high` / `@low` tasks |
+| `states` | 0.6 | started and waiting states (`t start`, `t wait`, `t status`) |
+
+When a feature is off, it is gone: its commands, keys, help lines, warnings
+and effects on ranking and planning. If you run one of its commands, tend tells
+you how to turn it back on. Your data is kept. For example, with `states` off,
+waiting tasks are back in the queue as normal tasks. Turn `states` on again and
+they are waiting again.
+
+The switches are in the `[features]` section of the config file, so you can
+also edit them there.
 
 ## Hooks and plugins
 
@@ -427,7 +462,7 @@ appends each finished task to a CSV file.
 
 ## Your data
 
-All data is in one SQLite file. Run `t ?` to see its path. By default it is
+All data is in one SQLite file. Run `t help` to see its path. By default it is
 `~/.local/share/tend/tend.db`.
 
 | Table | Contents |
@@ -483,6 +518,15 @@ every_days = 7
 high = []                 # e.g. ["09:00-12:00"]
 low = []                  # e.g. ["14:00-16:00"]
 
+[features]                # false removes a part completely
+review = true
+learning = true
+planning = true
+hooks = true
+plugins = true
+energy = true
+states = true
+
 [slips]
 quiet_rollovers = 2       # how many times a missed soft target moves without a message
 
@@ -510,6 +554,7 @@ The code is small and split by job:
 | `calibrate.py` | Corrections learned from your history |
 | `energy.py` | Energy windows |
 | `hooks.py` | Hooks and plugin lookup |
+| `features.py` | Feature switches |
 | `store.py` | SQLite schema, events and undo |
 | `parse.py` | Syntax for tasks, dates and durations |
 | `commands.py` | One function per command |
@@ -521,11 +566,13 @@ ffmpeg.
 
 ## Roadmap
 
-- **0.1:** capture, triage, the three rules, focus timer, slipped tasks, undo, JSON
-- **0.2:** estimate calibration and the weekly review
-- **0.3:** `t plan`, `t gantt`, calendar import and `.ics` export
-- **0.4:** hooks and plugins
-- **0.5:** energy windows, date corrections, push-back data
-- **0.6:** task states: todo, started, waiting, done, dropped
+| Version | What |
+|---|---|
+| 0.1 to 0.6 | Done: the core, review, learning, planning, hooks, plugins, energy, states |
+| 0.7 | Backups, export and import, a data reference |
+| 0.8 | Repeating tasks and reminders |
+| 0.9 | First-run guide, shell completion, themes, `t doctor` |
+| 1.0 | Stable data and plugin interfaces, PyPI release |
 
-The core is meant to stay small. New ideas should start as plugins.
+Every feature after 0.1 can be turned off. [ROADMAP.md](ROADMAP.md) has the
+details and the rules each release follows.

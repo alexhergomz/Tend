@@ -42,6 +42,7 @@ DEFAULTS = {
     "ui": {
         "footer": True,  # command bar under every output
     },
+    "features": {name: True for name in ("review", "learning", "planning", "hooks", "plugins", "energy", "states")},
 }
 
 TEMPLATE = """\
@@ -83,6 +84,15 @@ quiet_rollovers = 2       # a missed soft target rolls forward quietly this many
 
 [ui]
 footer = true             # show the command bar under every output
+
+[features]                # optional parts of tend; false removes a part completely
+review = true             # weekly review and its reminder
+learning = true           # corrections learned from your history, and t stats
+planning = true           # t plan, t gantt and calendar import
+hooks = true              # scripts that run after events
+plugins = true            # t-<name> programs run as t <name>
+energy = true             # energy windows and @high / @low tasks
+states = true             # started and waiting states
 """
 
 

@@ -132,13 +132,14 @@ def queue(ranked: list[Ranked], today: date):
         console.print(grid)
 
 
-def help_screen(config_path, data_path):
+def help_screen(config_path, data_path, shown=lambda name: True, extensions: bool = True):
     tbl = Table(box=None, show_header=False, padding=(0, 2))
     tbl.add_column(style=f"bold {ACCENT}")
     tbl.add_column(style="bold")
     tbl.add_column(style=DIM)
     for k, name, what in COMMANDS:
-        tbl.add_row(k, name, what)
+        if shown(name):
+            tbl.add_row(k, name, what)
     console.print(Text(" Commands", "bold"), Text("· t <key> or t <name> · t alone opens interactive mode", DIM))
     console.print(tbl)
     console.print()
@@ -153,9 +154,11 @@ def help_screen(config_path, data_path):
     ):
         console.print("   " + escape(line), style=DIM)
     console.print()
-    console.print(Text(" Plugins and hooks", "bold"))
-    console.print(f"   [{DIM}]any t-<name> program on your PATH runs as t <name> · t plugins lists them and your hooks[/]")
-    console.print()
+    if extensions:
+        console.print(Text(" Plugins and hooks", "bold"))
+        console.print(f"   [{DIM}]any t-<name> program on your PATH runs as t <name> · t plugins lists them and your hooks[/]")
+        console.print()
+    console.print(f"   [{DIM}]t features turns optional parts on and off[/]")
     console.print(f"   [{DIM}]config {config_path}\n   data   {data_path}[/]")
 
 
