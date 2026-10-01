@@ -2,16 +2,15 @@
 
 import json
 import os
-import pty
 import re
-import select
 import subprocess
 import sys
 import time
 
 import pytest
 
-pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="needs a POSIX terminal")
+pty = pytest.importorskip("pty", reason="needs a POSIX terminal")  # Windows has no pty
+select = pytest.importorskip("select")
 ANSI = re.compile(r"\x1b\[[0-9;?]*[a-zA-Z]")
 
 

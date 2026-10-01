@@ -3,6 +3,10 @@
 import os
 
 
+def pytest_collectreport(report):
+    pytest_runtest_logreport(report)
+
+
 def pytest_runtest_logreport(report):
     if os.environ.get("GITHUB_ACTIONS") and report.failed:
         text = str(report.longrepr)[-1500:].replace("%", "%25").replace("\r", "").replace("\n", "%0A")
