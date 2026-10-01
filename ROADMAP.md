@@ -9,8 +9,8 @@
    switch in `[features]`. When it is off, its commands, keys and effects are
    gone. Your data is kept, so you can turn it on again later.
 3. **Simple, reliable models only.** If something can't be done well with a
-   simple rule, tend stores the data and leaves the rest to plugins.
-4. **New ideas start as plugins.** A plugin moves into tend only if many people
+   simple rule, Tend stores the data and leaves the rest to plugins.
+4. **New ideas start as plugins.** A plugin moves into Tend only if many people
    need it and it fits these rules.
 5. **Your data is safe.** Every schema change has a migration and a test.
 

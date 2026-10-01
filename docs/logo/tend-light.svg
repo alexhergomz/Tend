@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 348 160" width="348" height="160" role="img" aria-label="Tend">
+  <title>Tend</title>
+  
+  <g transform="translate(24 24)" fill="none" stroke="#1f2328" stroke-width="11" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 22 H62 M34 22 V104"/>
+    <path d="M78 79 H128 A25 25 0 1 0 120.7 96.7"/>
+    <path d="M148 104 V54 M148 76 A22 22 0 0 1 192 76 V104"/>
+    <circle cx="234" cy="79" r="25"/>
+    <path d="M259 34 V104"/>
+  </g>
+  <path transform="translate(24 24)" d="M259 38 C261 18 274 6 298 3 C295 24 282 36 259 38 Z" fill="#22b3c6"/>
+</svg>

@@ -2,7 +2,7 @@
 """Hook: append every finished task to a CSV file.
 
 Install: copy to ~/.config/tend/hooks/on_done and chmod +x.
-tend sends the event as JSON on stdin: {"event", "time", "task": {...}}.
+Tend sends the event as JSON on stdin: {"event", "time", "task": {...}}.
 """
 import csv
 import json

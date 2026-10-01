@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="Tend">
+  <title>Tend</title>
+  <rect width="128" height="128" rx="28" fill="#1b1d23"/>
+  <g fill="none" stroke="#e6edf3" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M30 44 H86 M58 44 V102"/>
+  </g>
+  <path d="M86 47 C88 29 98 18 113 15 C111 33 102 45 86 47 Z" fill="#22b3c6"/>
+</svg>

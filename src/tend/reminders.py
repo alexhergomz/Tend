@@ -82,7 +82,7 @@ def send(title: str, body: str) -> bool:
     """A desktop notification. Returns False if this system has no way to show one."""
     try:
         if shutil.which("notify-send"):
-            subprocess.run(["notify-send", "-a", "tend", title, body], timeout=10, check=False)
+            subprocess.run(["notify-send", "-a", "Tend", title, body], timeout=10, check=False)
             return True
         if platform.system() == "Darwin":
             script = f"display notification {json.dumps(body)} with title {json.dumps(title)}"
@@ -106,9 +106,9 @@ def _env() -> dict[str, str]:
 
 def systemd_units(every: int) -> dict[str, str]:
     env = "".join(f'Environment="{k}={v}"\n' for k, v in _env().items())
-    service = ("[Unit]\nDescription=tend reminders\n\n[Service]\nType=oneshot\n"
+    service = ("[Unit]\nDescription=Tend reminders\n\n[Service]\nType=oneshot\n"
                f"ExecStart={' '.join(_command())}\n{env}")
-    timer = (f"[Unit]\nDescription=Run tend reminders every {every} minutes\n\n[Timer]\n"
+    timer = (f"[Unit]\nDescription=Run Tend reminders every {every} minutes\n\n[Timer]\n"
              f"OnCalendar=*:0/{every}\nPersistent=true\n\n[Install]\nWantedBy=timers.target\n")
     return {"tend-notify.service": service, "tend-notify.timer": timer}
 

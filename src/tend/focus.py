@@ -31,7 +31,7 @@ def notify(msg: str):
     console.bell()
     if shutil.which("notify-send"):
         try:
-            subprocess.Popen(["notify-send", "-a", "tend", "tend", msg],
+            subprocess.Popen(["notify-send", "-a", "Tend", "Tend", msg],
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except OSError:
             pass

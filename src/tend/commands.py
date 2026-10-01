@@ -813,7 +813,7 @@ def cmd_notify(app: App, args):
                 app.say(f" [{ACCENT}]✓[/] {escape(line)}")
         except (RuntimeError, OSError, subprocess.CalledProcessError) as e:
             raise UsageError(str(e)) from None
-        app.say(f" [{DIM}]tend now checks every {every} minutes. t notify --test sends a test reminder.[/]")
+        app.say(f" [{DIM}]Tend now checks every {every} minutes. t notify --test sends a test reminder.[/]")
         return
     if "--uninstall" in args:
         lines = reminders.uninstall()
@@ -821,7 +821,7 @@ def cmd_notify(app: App, args):
             app.say(f" [{DIM}]{escape(line)}[/]")
         return
     if "--test" in args:
-        ok = reminders.send("tend", "Reminders work.")
+        ok = reminders.send("Tend", "Reminders work.")
         return app.say(f" [{ACCENT}]✓[/] sent a test reminder" if ok else
                        f" [{WARN}]This system has no notify-send or osascript. Hooks still get reminders.[/]")
     now = datetime.now()
@@ -869,7 +869,7 @@ def cmd_restore(app: App, args):
             return app.emit([{"n": i, "path": str(c.path), "kind": c.kind, "made": c.made,
                               "open_tasks": c.open_tasks()} for i, c in enumerate(found, 1)])
         if not found:
-            return app.say(f" [{DIM}]No copies yet. One is made every day you use tend, or now with[/] t backup")
+            return app.say(f" [{DIM}]No copies yet. One is made every day you use Tend, or now with[/] t backup")
         console.print(f" [bold]Copies of your data[/] [{DIM}]· newest first · {escape(str(backup.folder(app.cfg)))}[/]")
         for i, c in enumerate(found, 1):
             n = c.open_tasks()

@@ -98,7 +98,7 @@ def check(path: Path) -> bool:
 def restore(db: sqlite3.Connection, cfg: dict, path: Path) -> Path:
     """Replace the current data with a copy. Saves the current data first and returns that copy."""
     if not check(path):
-        raise ValueError(f"{path.name} is damaged or not a tend database")
+        raise ValueError(f"{path.name} is damaged or not a Tend database")
     before = make(db, cfg, "before")
     src = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     src.backup(db)

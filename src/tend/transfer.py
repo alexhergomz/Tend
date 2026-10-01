@@ -48,11 +48,11 @@ def read(lines: Iterable[str]) -> tuple[dict, dict[str, list[dict]]]:
     try:
         header = json.loads(next(it))
     except (StopIteration, json.JSONDecodeError):
-        raise TransferError("this is not a tend export (no header line)") from None
+        raise TransferError("this is not a Tend export (no header line)") from None
     if header.get("format") != FORMAT:
-        raise TransferError("this is not a tend export")
+        raise TransferError("this is not a Tend export")
     if header.get("format_version", 0) > FORMAT_VERSION or header.get("schema", 0) > VERSION:
-        raise TransferError(f"this file was made by a newer tend ({header.get('app_version')}). Update tend first.")
+        raise TransferError(f"this file was made by a newer Tend ({header.get('app_version')}). Update Tend first.")
     data: dict[str, list[dict]] = {t: [] for t in TABLES}
     for n, line in enumerate(it, start=2):
         try:

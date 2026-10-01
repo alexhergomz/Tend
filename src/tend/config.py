@@ -55,7 +55,7 @@ DEFAULTS = {
 }
 
 TEMPLATE = """\
-# tend configuration. Delete a line to go back to its default.
+# Tend configuration. Delete a line to go back to its default.
 
 [focus]
 default_mode = "pomo"     # pomo | flow | box

@@ -39,7 +39,7 @@ class App:
         try:
             backup.daily(self.store.db, self.cfg, date.today())
         except OSError as e:  # a failed backup must never stop you from using tend
-            print(f"tend: daily backup failed: {e}", file=sys.stderr)
+            print(f"Tend: daily backup failed: {e}", file=sys.stderr)
         self.reload()
 
     def reload(self):

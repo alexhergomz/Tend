@@ -97,7 +97,7 @@ def test_import_adds_renumbers_and_skips_duplicates(tmp_path):
 def test_newer_or_foreign_files_are_refused():
     with pytest.raises(transfer.TransferError, match="newer"):
         transfer.read(['{"format": "tend-export", "format_version": 1, "schema": 99}'])
-    with pytest.raises(transfer.TransferError, match="not a tend export"):
+    with pytest.raises(transfer.TransferError, match="not a Tend export"):
         transfer.read(['{"hello": 1}'])
 
 

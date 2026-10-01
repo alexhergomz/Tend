@@ -1,6 +1,6 @@
 # Data reference
 
-**Version 1** · database schema 4 · export format 1 · tend 0.8
+**Version 1** · database schema 4 · export format 1 · Tend 0.8
 
 This page describes everything a plugin, hook or script can rely on: the
 database, the JSON output, the export format, hook payloads and the plugin
@@ -83,7 +83,7 @@ data was replaced or added to, and `t undo` stops there.
 
 ### `meta`
 
-Small values tend keeps for itself, such as the last review date. Not stable.
+Small values Tend keeps for itself, such as the last review date. Not stable.
 
 ## JSON output
 
@@ -127,7 +127,7 @@ columns above.
 
 `t import` accepts files with missing columns, which get their default. Only
 `id`, `title` and `created` are required for a task. It refuses a file from a
-newer tend. The importers in `examples/plugins/` write this format, so you can
+newer Tend. The importers in `examples/plugins/` write this format, so you can
 use them as a starting point for your own.
 
 ## Plugins
@@ -139,7 +139,7 @@ arguments, and these environment variables:
 |---|---|
 | `TEND_DB` | Path to the database |
 | `TEND_CONFIG` | Path to the config file |
-| `TEND_VERSION` | tend's version |
+| `TEND_VERSION` | Tend's version |
 
 If you type `--json`, it is passed on to the plugin.
 

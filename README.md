@@ -1,4 +1,9 @@
-# tend
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/logo/tend-dark.svg">
+    <img alt="Tend" src="docs/logo/tend-light.svg" width="280">
+  </picture>
+</p>
 
 A task manager for the terminal. It shows one task at a time, tells you why it
 picked that task, and keeps long-term goals from being forgotten.
@@ -12,7 +17,7 @@ especially people with ADHD, choosing is the hard part. You look at the list,
 freeze, and then pick whatever is most urgent. Important work with a far
 deadline waits until it becomes an emergency.
 
-tend makes the choice for you with three simple rules, each taken from an
+Tend makes the choice for you with three simple rules, each taken from an
 existing planning method. It shows the reason next to the task. If you don't
 like the choice, press `s` to skip it. You don't need to give a reason.
 
@@ -23,7 +28,7 @@ Other design choices:
 - Missed deadlines are never hidden, and they are never shown as a red wall.
   Each one needs a decision (see [Missed dates](#missed-dates)).
 - `t plan` builds a schedule around your calendar with the same rules.
-- tend learns from your history: how long tasks really take, and how late you
+- Tend learns from your history: how long tasks really take, and how late you
   usually finish compared to your dates. It corrects for both.
 - Energy windows keep hard tasks in the hours when you think best.
 - Hooks and plugins let you add anything else, in any language.
@@ -59,12 +64,12 @@ and each one takes a single keypress.
 
 ![Triage: three questions per task](docs/triage.gif)
 
-## How tend picks the next task
+## How Tend picks the next task
 
 The rules run in order. The first rule that matches decides.
 
 **1. A deadline at risk comes first.**
-tend computes the *slack* of each task with a hard deadline:
+Tend computes the *slack* of each task with a hard deadline:
 
 ```
 slack = days until the deadline − hours of work left ÷ focus hours per day
@@ -142,18 +147,18 @@ Splitting a task and starting one of its steps also starts the original task.
 
 ## Missed dates
 
-tend has two kinds of date:
+Tend has two kinds of date:
 
 - `due:` is a **hard deadline**. Missing it has a real cost, for example a late fee.
 - `aim:` is a **soft target**. It is a date you set for yourself.
 
 A task **slips** when its date passes and the task is not done.
 
-- **Soft target:** the first two times, tend moves the date to today without a
+- **Soft target:** the first two times, Tend moves the date to today without a
   message. The third time, the task needs a decision.
 - **Hard deadline:** the task needs a decision right away.
 
-tend never hides these tasks. The status line under every command shows how many
+Tend never hides these tasks. The status line under every command shows how many
 need a decision, for example `2 slipped`. The count stays until you decide.
 
 ### Deciding: `t resolve`
@@ -196,7 +201,7 @@ t weekly report aim:fri every:fri
 | `every:week`, `every:month`, `every:year` | |
 | `every:1st`, `every:15th`, `every:last` | on this day of the month |
 
-Only **one copy** exists at a time. When you finish it, tend creates the next
+Only **one copy** exists at a time. When you finish it, Tend creates the next
 one, with its date moved along the rhythm. Goal, value, size, estimate and
 energy are copied. A task without a date gets the first date of its rule.
 
@@ -230,7 +235,7 @@ habit over time.
 Each reminder is sent once. Outside your working day (`day_start` to `day_end`)
 nothing is sent, and reminders wait until the day starts.
 
-tend never runs in the background by itself. To check every 15 minutes, install
+Tend never runs in the background by itself. To check every 15 minutes, install
 a timer:
 
 ```sh
@@ -300,7 +305,7 @@ To export the plan to your own calendar app, run `t plan --ics > plan.ics`.
 
 ### Calendar
 
-tend reads busy times from `.ics` files or URLs. Most calendar apps can give
+Tend reads busy times from `.ics` files or URLs. Most calendar apps can give
 you one. In Google Calendar, open *Settings and sharing* for your calendar, then
 copy *Secret address in iCal format*. Add it to the config:
 
@@ -309,14 +314,14 @@ copy *Secret address in iCal format*. Add it to the config:
 ics = ["~/calendars/uni.ics", "https://calendar.google.com/calendar/ical/.../basic.ics"]
 ```
 
-tend supports repeating events, time zones, deleted and moved repeats, and
+Tend supports repeating events, time zones, deleted and moved repeats, and
 events marked as "free". All-day events don't block any hours. URLs are cached
-for 15 minutes. If you are offline, tend uses the last copy.
+for 15 minutes. If you are offline, Tend uses the last copy.
 
 ## Learning from your history
 
 Most people underestimate how long tasks take, and finish later than the date
-they set. tend measures both, and corrects for them without asking you to
+they set. Tend measures both, and corrects for them without asking you to
 change how you estimate. Run `t stats` (key `i`) to see the numbers.
 
 ![How your plans usually go](docs/stats.png)
@@ -348,7 +353,7 @@ To turn off all corrections, set `calibrate = false`.
 
 ## Energy windows
 
-Some tasks need a clear head, and some don't. Tell tend when your good hours are:
+Some tasks need a clear head, and some don't. Tell Tend when your good hours are:
 
 ```toml
 [energy]
@@ -380,7 +385,7 @@ It takes about five minutes and has seven steps:
    the queue, done, or drop.
 6. **Old tasks:** tasks older than 30 days, with no date and no focus time.
    Keep them, give them a date, or drop them.
-7. **Goals:** if a goal has no open tasks, rule 2 can't help it. tend asks you
+7. **Goals:** if a goal has no open tasks, rule 2 can't help it. Tend asks you
    for one small next step.
 
 Press `q` at any question to stop.
@@ -451,12 +456,12 @@ Dates: `today`, `tom`, `mon` to `sun`, `+3d`, `+2w`, `oct20`, `10-20`,
 `eom` (end of month). Use `due:none` to
 clear a date.
 
-`!2` and `~45m` also work, but zsh changes them before tend can read them.
+`!2` and `~45m` also work, but zsh changes them before Tend can read them.
 Use them only inside quotes.
 
 ## Turning features off
 
-The core of tend is always on: capture, triage, the three rules, the focus
+The core of Tend is always on: capture, triage, the three rules, the focus
 timer, split, skip, slipped tasks, goals, wins, undo and JSON. Everything added
 after 0.1 is a **feature** you can turn off, like a plugin you don't install.
 
@@ -479,7 +484,7 @@ t features on states
 | `reminders` | 0.8 | desktop reminders (`t notify`) |
 
 When a feature is off, it is gone: its commands, keys, help lines, warnings
-and effects on ranking and planning. If you run one of its commands, tend tells
+and effects on ranking and planning. If you run one of its commands, Tend tells
 you how to turn it back on. Your data is kept. For example, with `states` off,
 waiting tasks are back in the queue as normal tasks. Turn `states` on again and
 they are waiting again.
@@ -489,7 +494,7 @@ also edit them there.
 
 ## Hooks and plugins
 
-tend stays small. If you want more, add it with hooks and plugins. You can
+Tend stays small. If you want more, add it with hooks and plugins. You can
 write them in any language.
 
 ### Plugins
@@ -501,7 +506,7 @@ arguments you typed, plus these environment variables:
 |---|---|
 | `TEND_DB` | path to the SQLite database |
 | `TEND_CONFIG` | path to the config file |
-| `TEND_VERSION` | tend's version |
+| `TEND_VERSION` | Tend's version |
 
 A plugin can read data with `t ls --json` (or any command with `--json`), or with
 SQL. Commands always come first: a plugin can't replace a built-in command.
@@ -540,7 +545,7 @@ The hook gets the event as JSON on stdin:
 {"event": "on_done", "time": "2026-09-29T18:40:12", "task": {"id": 4, "title": "reply to professor", ...}}
 ```
 
-Hooks run in the background. They can't slow tend down or change what it does.
+Hooks run in the background. They can't slow Tend down or change what it does.
 Their output goes to `hooks.log`, next to the database. `examples/hooks/on_done`
 appends each finished task to a CSV file.
 
@@ -570,7 +575,7 @@ export format, hook payloads and the plugin environment.
 
 ### Backups
 
-tend copies your data **every day**, the first time you use it that day. It
+Tend copies your data **every day**, the first time you use it that day. It
 keeps the last 7 daily copies. It also saves a copy before every restore and
 every import. Copies are made with SQLite's backup function, so they are never
 half-written.
@@ -594,7 +599,7 @@ t import tasks.jsonl --replace --yes   # make an exact copy instead
 ```
 
 - **Into an empty database,** an import is an exact copy, ids and history
-  included. Use this to move tend to another computer.
+  included. Use this to move Tend to another computer.
 - **Into a database with tasks,** an import adds them as new tasks. Ids are
   renumbered, split tasks stay linked, and goals are matched by name. A task with
   the same title and creation time as one you have is skipped, so importing the
@@ -613,12 +618,12 @@ PATH, then:
 | Taskwarrior | `task export > tw.json && t import-taskwarrior tw.json` | project, priority, due, scheduled, wait, completed, deleted |
 | CSV | `t import-csv tasks.csv` | columns `title`, `goal`, `due`, `aim`, `value`, `size`, `estimate`, `status` |
 
-Each one converts the file to tend's export format and passes it to `t import`.
+Each one converts the file to Tend's export format and passes it to `t import`.
 Add `--dry-run` to see the converted data without importing it.
 
 ## Configuration
 
-The config file is `~/.config/tend/config.toml`. tend creates it on first run,
+The config file is `~/.config/tend/config.toml`. Tend creates it on first run,
 with a comment on each option.
 
 ```toml
@@ -698,6 +703,7 @@ The code is small and split by job:
 | `energy.py` | Energy windows |
 | `hooks.py` | Hooks and plugin lookup |
 | `features.py` | Feature switches |
+| `docs/logo/` | Logo: light and dark wordmark, and an icon |
 | `backup.py`, `transfer.py` | Backups, export and import |
 | `repeat.py`, `reminders.py` | Repeat rules and reminders |
 | `store.py` | SQLite schema, events and undo |
