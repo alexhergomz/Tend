@@ -6,7 +6,7 @@ AGG=${AGG:-agg}
 TMP=$(mktemp -d)
 python3 docs/demo/record.py "$TMP"
 opts=(--font-family "DejaVu Sans Mono" --font-size 18 --theme monokai --idle-time-limit 3 --last-frame-duration 4)
-for n in capture interactive triage focus resolve review states; do
+for n in capture interactive triage focus resolve review states repeat; do
   "$AGG" -q "${opts[@]}" "$TMP/$n.cast" "docs/$n.gif"
 done
 # still images: the last frame of these sessions

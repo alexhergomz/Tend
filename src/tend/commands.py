@@ -1,3 +1,4 @@
+import subprocess
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -6,7 +7,7 @@ from rich.markup import escape
 from rich.padding import Padding
 from rich.text import Text
 
-from . import backup, config, features, fmt, hooks, keys, parse, slips, transfer, ui, views
+from . import backup, config, features, fmt, hooks, keys, parse, reminders, repeat, slips, transfer, ui, views
 from . import focus as focus_timer
 from .app import App, UsageError
 from .store import UndoBlocked
@@ -83,21 +84,49 @@ def cmd_focus(app: App, args):
         app.bar("next")
 
 
+def _dates_for_repeat(app: App, t: Task):
+    """A repeating task always has a date: without one, it gets the first date of its rule."""
+    if t.repeat and app.on("repeat") and not t.due and not t.aim:
+        t.aim = repeat.parse(t.repeat).first(app.today)
+
+
+def _next_copy(app: App, t: Task) -> Task | None:
+    """Inside an event: create the next copy of a repeating task. Returns it."""
+    if not (t.repeat and app.on("repeat")):
+        return None
+    planned = t.due or t.aim or app.today
+    nxt = repeat.parse(t.repeat).next_after(planned, max(planned, app.today))
+    shift = nxt - planned
+    copy = Task(id=None, title=t.title, goal=t.goal, value=t.value, size=t.size, estimate_min=t.estimate_min,
+                energy=t.energy, repeat=t.repeat, series=t.series or t.id,
+                due=t.due + shift if t.due else None, aim=(t.aim + shift if t.aim else None) if t.due or t.aim else nxt)
+    app.store.insert(copy)
+    return copy
+
+
+def _say_next(app: App, copy: Task | None):
+    if copy:
+        app.say(f"   [{DIM}]↻ next one {fmt.day(copy.due or copy.aim, app.today)} · #{copy.id}[/]")
+
+
 def _complete(app: App, t: Task):
     with app.store.event("done", f"done #{t.id} {t.title}"):
         t.status, t.done_at = "done", now_iso()
         app.store.update(t)
+        copy = _next_copy(app, t)
         parent = app.store.task(t.parent) if t.parent else None
         while parent and parent.status == "open" and not app.store.children(parent.id):
             parent.status, parent.done_at = "done", now_iso()
             app.store.update(parent)
             app.say(f" [{ACCENT}]✓[/] all steps done · {_t(parent)}")
+            _next_copy(app, parent)
             parent = app.store.task(parent.parent) if parent.parent else None
     app.store.set_meta("current", None)
     app.hook("on_done", app.store.task(t.id))
     app.hook("on_status", app.store.task(t.id), old=t.stage, new="done")
     n = len(app.store.done_since(app.today))
     app.say(f" [{ACCENT}]✓[/] {_t(t)}  [{DIM}]{n} done today[/]")
+    _say_next(app, copy)
 
 
 def cmd_done(app: App, args):
@@ -174,6 +203,7 @@ def cmd_add(app: App, args):
     if not title:
         raise UsageError("a task needs a title")
     t = Task(id=None, title=title, **f)
+    _dates_for_repeat(app, t)
     with app.store.event("add") as ev:
         app.store.insert(t)
         ev["summary"] = f"add #{t.id} {t.title}"
@@ -182,6 +212,9 @@ def cmd_add(app: App, args):
         return app.emit(t.to_json())
     where = "" if t.triaged else f" [{DIM}]→ inbox[/]"
     app.say(f" [{ACCENT}]+[/] {_t(t)} [{DIM}]#{t.id}[/]{where}")
+    if t.repeat and app.on("repeat"):
+        first = t.due or t.aim
+        app.say(f"   [{DIM}]↻ {repeat.parse(t.repeat).describe()} · first one {fmt.day(first, app.today)}[/]")
     _add_goal_hint(app, t.goal)
     app.bar("added")
 
@@ -204,6 +237,7 @@ def cmd_edit(app: App, args):
             t.title = title
         for k, v in f.items():
             setattr(t, k, v)
+        _dates_for_repeat(app, t)
         if "aim" in f or "due" in f:
             t.slips = 0
         app.store.update(t)
@@ -293,25 +327,44 @@ def cmd_status(app: App, args):
     app.bar("next")
 
 
-def _drop(app: App, t: Task):
-    with app.store.event("drop", f"drop #{t.id} {t.title}"):
+def _drop(app: App, t: Task, once: bool = False):
+    """Drop a task and its steps. With once=True, a repeating task gets its next copy (skip this one)."""
+    with app.store.event("drop", f"{'skip once' if once else 'drop'} #{t.id} {t.title}"):
         stack = [t]
         while stack:
             cur = stack.pop()
             cur.status, cur.done_at = "dropped", now_iso()
             app.store.update(cur)
             stack.extend(app.store.children(cur.id))
+        copy = _next_copy(app, t) if once else None
     app.store.set_meta("current", None)
     app.hook("on_drop", t)
     app.hook("on_status", t, old=t.stage, new="dropped")
-    app.say(f" [{DIM}]let go:[/] {escape(t.title)} [{DIM}]· u to undo[/]")
+    if once:
+        app.say(f" [{DIM}]skipped this time:[/] {escape(t.title)} [{DIM}]· u to undo[/]")
+        _say_next(app, copy)
+    else:
+        app.say(f" [{DIM}]let go:[/] {escape(t.title)} [{DIM}]· u to undo[/]")
+
+
+def _ask_once(app: App, t: Task, args) -> bool:
+    """For a repeating task: skip just this one (True) or stop the series (False)?"""
+    if not (t.repeat and app.on("repeat")):
+        return False
+    if "--once" in args:
+        return True
+    if "--stop" in args or not keys.interactive():
+        return False
+    k = ui.choose(f"{t.title} repeats {repeat.parse(t.repeat).describe()}.",
+                  {"o": "skip just this one", "s": "stop repeating"})
+    return k == "o"
 
 
 def cmd_drop(app: App, args):
-    t = app.target(args)
+    t = app.target([a for a in args if not a.startswith("--")])
     if not t:
         return app.say(f" [{DIM}]Nothing to drop.[/]")
-    _drop(app, t)
+    _drop(app, t, once=_ask_once(app, t, args))
     app.bar("next")
 
 
@@ -385,11 +438,13 @@ def cmd_resolve(app: App, args):
     for t in todo:
         hard = bool(t.due and t.due < app.today)
         console.print(f"\n {_t(t)}  [{WARN}]{slips.why(t, app.today)}[/]")
-        k = ui.choose("", {"n": "today", "r": "reschedule", "x": "split", "k": "drop", "q": "later"})
+        repeating = bool(t.repeat and app.on("repeat"))
+        k = ui.choose("", {"n": "today", "r": "reschedule", "x": "split",
+                           "k": "skip this one" if repeating else "drop", "q": "later"})
         if k == "q":
             break
         if k == "k":
-            _drop(app, t)
+            _drop(app, t, once=repeating)
         elif k == "x":
             steps = []
             while step := ui.ask(f"   step {len(steps) + 1} › "):
@@ -749,6 +804,46 @@ def cmd_features(app: App, args):
     app.bar("stats")
 
 
+# ── reminders ───────────────────────────────────────────────────────────
+def cmd_notify(app: App, args):
+    every = app.cfg["reminders"]["every_minutes"]
+    if "--install" in args:
+        try:
+            for line in reminders.install(every):
+                app.say(f" [{ACCENT}]✓[/] {escape(line)}")
+        except (RuntimeError, OSError, subprocess.CalledProcessError) as e:
+            raise UsageError(str(e)) from None
+        app.say(f" [{DIM}]tend now checks every {every} minutes. t notify --test sends a test reminder.[/]")
+        return
+    if "--uninstall" in args:
+        lines = reminders.uninstall()
+        for line in lines or ["no timer was installed"]:
+            app.say(f" [{DIM}]{escape(line)}[/]")
+        return
+    if "--test" in args:
+        ok = reminders.send("tend", "Reminders work.")
+        return app.say(f" [{ACCENT}]✓[/] sent a test reminder" if ok else
+                       f" [{WARN}]This system has no notify-send or osascript. Hooks still get reminders.[/]")
+    now = datetime.now()
+    todo = reminders.pending(app, now)
+    quiet = app.cfg["reminders"]["quiet_outside_day"] and not reminders.in_working_day(app, now)
+    dry = "--dry-run" in args
+    if app.json:
+        return app.emit({"quiet": quiet, "reminders": [r.to_json() for r in todo]})
+    if quiet and not dry:
+        return app.say(f" [{DIM}]Outside the working day: {len(todo)} reminder(s) wait for later.[/]")
+    for r in todo:
+        if not dry:
+            reminders.send(r.title, r.body)
+            app.hook("on_remind", app.store.task(r.task_id) if r.task_id else None,
+                     title=r.title, body=r.body, key=r.key)
+        app.say(f" [{ACCENT}]●[/] [bold]{escape(r.title)}[/] [{DIM}]{escape(r.body)}[/]")
+    if not dry:
+        reminders.mark_sent(app, todo, now)
+    if not todo:
+        app.say(f" [{DIM}]Nothing new to remind you of.[/]")
+
+
 # ── your data ───────────────────────────────────────────────────────────
 def cmd_backup(app: App, args):
     path = backup.make(app.store.db, app.cfg, "manual")
@@ -865,6 +960,7 @@ COMMANDS = {
     "resolve": cmd_resolve, "plan": cmd_plan, "gantt": cmd_gantt, "review": cmd_review,
     "goals": cmd_goals, "wins": cmd_wins, "stats": cmd_stats, "plugins": cmd_plugins, "features": cmd_features,
     "backup": cmd_backup, "restore": cmd_restore, "export": cmd_export, "import": cmd_import,
+    "notify": cmd_notify,
     "undo": cmd_undo, "help": cmd_help,
 }
 ALIASES = {k: name for k, name, _ in ui.COMMANDS if k} | {"list": "ls", "goal": "goals", "log": "wins"}

@@ -178,6 +178,80 @@ dropped (`k`).
 
 ![Resolving slipped tasks](docs/resolve.gif)
 
+## Repeating tasks
+
+Add `every:` to a task:
+
+```sh
+t water plants every:mon,thu
+t pay rent due:1st every:month
+t weekly report aim:fri every:fri
+```
+
+| Rule | Meaning |
+|---|---|
+| `every:day`, `every:weekday` | every day, Monday to Friday |
+| `every:mon`, `every:mon,thu` | on these days of the week |
+| `every:3d`, `every:2w`, `every:2m` | every 3 days, 2 weeks, 2 months |
+| `every:week`, `every:month`, `every:year` | |
+| `every:1st`, `every:15th`, `every:last` | on this day of the month |
+
+Only **one copy** exists at a time. When you finish it, tend creates the next
+one, with its date moved along the rhythm. Goal, value, size, estimate and
+energy are copied. A task without a date gets the first date of its rule.
+
+The next date is the first one in the rhythm that is after **both** the planned
+date and today:
+
+- Finish Monday's task on Wednesday, and the next one is next Monday. The
+  rhythm holds.
+- Finish it three weeks late, and you still get one new copy, not three. Missed
+  repeats never pile up.
+- Finish Thursday's task on Wednesday, and it counts as Thursday's.
+
+To skip one time, `t drop` asks "skip just this one, or stop repeating?". Use
+`t drop 4 --once` or `--stop` to answer in advance. In `t resolve`, the drop
+choice skips just this one. To stop a series, use `t edit 4 every:none`.
+
+Every copy has the id of the first task in `series`, so a plugin can follow a
+habit over time.
+
+![A repeating task: finish one, the next one appears](docs/repeat.gif)
+
+## Reminders
+
+`t notify` checks once and sends a desktop notification for anything new:
+
+- **Today starts with:** the first task of the day, once a day, after `day_start`.
+- **Deadline at risk:** when a hard deadline becomes at risk (rule 1).
+- **Missed deadline:** when a hard deadline passes.
+- **Back from waiting:** when a waiting task comes back on its date.
+
+Each reminder is sent once. Outside your working day (`day_start` to `day_end`)
+nothing is sent, and reminders wait until the day starts.
+
+tend never runs in the background by itself. To check every 15 minutes, install
+a timer:
+
+```sh
+t notify --install     # systemd user timer on Linux, launchd agent on macOS
+t notify --test        # send a test reminder
+t notify --dry-run     # show what would be sent, without sending
+t notify --uninstall
+```
+
+Without systemd or launchd, run `t notify` from cron.
+
+To get reminders on your phone, write an `on_remind` hook. It receives each
+reminder as JSON, and can forward it, for example to [ntfy](https://ntfy.sh):
+
+```sh
+#!/bin/sh
+# ~/.config/tend/hooks/on_remind
+python3 -c 'import json,sys; e=json.load(sys.stdin); print(e["title"] + ": " + e["body"])' \
+  | curl -s -d @- ntfy.sh/your-private-topic > /dev/null
+```
+
 ## Focus timer
 
 `t focus` starts a timer on the current task. It has three modes:
@@ -344,6 +418,7 @@ mode (`t` with no arguments), you only press the letter.
 | `u` | `undo` | Undo the last change |
 | `?` | `help` | Show all commands and the syntax |
 | | `features` | Turn optional parts on and off: `t features off states` |
+| | `notify` | Send new reminders (`--install` sets up a timer) |
 | | `backup` | Save a copy of your data now |
 | | `restore` | List copies, or go back to one: `t restore 2` |
 | | `export` | Write all data as JSON lines |
@@ -369,9 +444,11 @@ Words become the title. Tokens set the fields. You can put tokens anywhere.
 | `s:S`, `s:M`, `s:L` | Size | `s:M` |
 | `e:<time>` | Estimate. Also sets the size. | `e:45m`, `e:2h`, `e:1h30m` |
 | `@high`, `@low` | Energy the task needs. `@any` clears it. | `@high` |
+| `every:<rule>` | Repeat the task. `every:none` stops it. | `every:mon`, `every:2w`, `every:1st` |
 
 Dates: `today`, `tom`, `mon` to `sun`, `+3d`, `+2w`, `oct20`, `10-20`,
-`2026-10-20`, `eow` (end of week), `eom` (end of month). Use `due:none` to
+`2026-10-20`, `1st` or `15th` (of this or next month), `eow` (end of week),
+`eom` (end of month). Use `due:none` to
 clear a date.
 
 `!2` and `~45m` also work, but zsh changes them before tend can read them.
@@ -398,6 +475,8 @@ t features on states
 | `plugins` | 0.4 | `t-<name>` programs run as `t <name>` |
 | `energy` | 0.5 | energy windows and `@high` / `@low` tasks |
 | `states` | 0.6 | started and waiting states (`t start`, `t wait`, `t status`) |
+| `repeat` | 0.8 | repeating tasks (`every:mon`) |
+| `reminders` | 0.8 | desktop reminders (`t notify`) |
 
 When a feature is off, it is gone: its commands, keys, help lines, warnings
 and effects on ranking and planning. If you run one of its commands, tend tells
@@ -452,6 +531,7 @@ To run several hooks for one event, put them in a folder instead, such as
 | `on_focus_start` | a focus session started |
 | `on_focus_end` | a focus session ended (with `minutes` and `outcome`) |
 | `on_review` | the weekly review was finished |
+| `on_remind` | a reminder was sent (with `title` and `body`) |
 | `on_change` | any change at all, with the full row before and after |
 
 The hook gets the event as JSON on stdin:
@@ -577,6 +657,10 @@ low = []                  # e.g. ["14:00-16:00"]
 keep_days = 7             # daily copies to keep
 folder = ""               # empty: next to the database
 
+[reminders]
+every_minutes = 15        # how often the timer from t notify --install runs
+quiet_outside_day = true  # no reminders outside day_start..day_end
+
 [features]                # false removes a part completely
 review = true
 learning = true
@@ -615,6 +699,7 @@ The code is small and split by job:
 | `hooks.py` | Hooks and plugin lookup |
 | `features.py` | Feature switches |
 | `backup.py`, `transfer.py` | Backups, export and import |
+| `repeat.py`, `reminders.py` | Repeat rules and reminders |
 | `store.py` | SQLite schema, events and undo |
 | `parse.py` | Syntax for tasks, dates and durations |
 | `commands.py` | One function per command |
@@ -628,8 +713,7 @@ ffmpeg.
 
 | Version | What |
 |---|---|
-| 0.1 to 0.7 | Done: the core, review, learning, planning, hooks, plugins, energy, states, backups, export and import |
-| 0.8 | Repeating tasks and reminders |
+| 0.1 to 0.8 | Done: the core, review, learning, planning, hooks, plugins, energy, states, backups, export and import, repeating tasks, reminders |
 | 0.9 | First-run guide, shell completion, themes, `t doctor` |
 | 1.0 | Stable data and plugin interfaces, PyPI release |
 

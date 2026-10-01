@@ -253,6 +253,15 @@ def states():
     c.save()
 
 
+def repeating():
+    seed()
+    new_id = sqlite3.connect(DB).execute("SELECT MAX(id) FROM tasks").fetchone()[0] + 1
+    c = Cast("repeat", rows=24)
+    c.run("t water plants every:mon,thu +home s:S v:2", after=1.5)
+    c.run(f"t done {new_id}", after=3)
+    c.save()
+
+
 def queue():
     seed()
     t("call the dentist")
@@ -264,7 +273,7 @@ def queue():
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     only = sys.argv[2:]
-    for fn in (capture, interactive, triage, focus, resolve, planning, review, stats, states, queue):
+    for fn in (capture, interactive, triage, focus, resolve, planning, review, stats, states, repeating, queue):
         if not only or fn.__name__ in only:
             print("recording", fn.__name__, flush=True)
             fn()

@@ -46,7 +46,12 @@ DEFAULTS = {
         "keep_days": 7,  # daily copies to keep
         "folder": "",  # empty: next to the database
     },
-    "features": {name: True for name in ("review", "learning", "planning", "hooks", "plugins", "energy", "states")},
+    "reminders": {
+        "every_minutes": 15,  # how often the timer from t notify --install runs
+        "quiet_outside_day": True,  # no reminders outside [schedule] day_start..day_end
+    },
+    "features": {name: True for name in ("review", "learning", "planning", "hooks", "plugins", "energy", "states",
+                                         "repeat", "reminders")},
 }
 
 TEMPLATE = """\
@@ -93,6 +98,10 @@ footer = true             # show the command bar under every output
 keep_days = 7             # a copy of your data is made every day; this many are kept
 folder = ""               # where copies go; empty means next to the database
 
+[reminders]
+every_minutes = 15        # how often the timer from `t notify --install` runs
+quiet_outside_day = true  # no reminders outside [schedule] day_start..day_end
+
 [features]                # optional parts of tend; false removes a part completely
 review = true             # weekly review and its reminder
 learning = true           # corrections learned from your history, and t stats
@@ -101,6 +110,8 @@ hooks = true              # scripts that run after events
 plugins = true            # t-<name> programs run as t <name>
 energy = true             # energy windows and @high / @low tasks
 states = true             # started and waiting states
+repeat = true             # repeating tasks (every:mon)
+reminders = true          # desktop reminders from a timer (t notify)
 """
 
 

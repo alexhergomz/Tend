@@ -12,7 +12,7 @@ TODAY = date(2026, 9, 29)  # a Tuesday
     ("tue", TODAY), ("monday", date(2026, 10, 5)), ("+3d", date(2026, 10, 2)),
     ("2w", date(2026, 10, 13)), ("oct20", date(2026, 10, 20)), ("20oct", date(2026, 10, 20)),
     ("10-20", date(2026, 10, 20)), ("2027-01-05", date(2027, 1, 5)), ("jan5", date(2027, 1, 5)),
-    ("eow", date(2026, 10, 4)), ("eom", date(2026, 9, 30)),
+    ("eow", date(2026, 10, 4)), ("eom", date(2026, 9, 30)), ("1st", date(2026, 10, 1)), ("29th", TODAY),
 ])
 def test_dates(text, expected):
     assert parse_date(text, TODAY) == expected

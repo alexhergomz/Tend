@@ -32,6 +32,8 @@ class Task:
     pushes: int = 0  # times a date moved later, never reset
     stage: str = "todo"  # todo / started / waiting, while status is open
     started_at: str | None = None  # first time work started
+    repeat: str | None = None  # rule after every:, such as "mon" or "2w"
+    series: int | None = None  # id of the first task of a repeating series
 
     @property
     def state(self) -> str:

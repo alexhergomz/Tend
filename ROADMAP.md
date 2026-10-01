@@ -30,21 +30,8 @@
 | 0.7 | Daily backups, `t backup`, `t restore` | core |
 | 0.7 | `t export`, `t import`, data reference (`docs/data.md`) | core |
 | 0.7 | Importers for todo.txt, Taskwarrior and CSV | plugins in `examples/` |
-
-## 0.8: Repeating tasks and reminders
-
-The two most requested features in task apps, built in the simplest way.
-
-- **Repeating tasks** (`repeat`). The token `every:mon`, `every:2w`, `every:month`
-  or `every:1st` sets the rule. When you finish the task, tend creates the next
-  copy with the next date. Only one copy exists at a time, so a missed repeat
-  never piles up. The next date is counted from the planned date, not from the
-  day you finished, so the rhythm stays stable.
-- **Reminders** (`reminders`). `t notify` sends a desktop notification for:
-  deadlines that just became at risk, waiting tasks that came back, and the
-  first task of the day. It is meant to run from a timer. `t notify --install`
-  writes a systemd user timer (Linux) or a launchd agent (macOS) that runs it
-  every 15 minutes. tend itself never runs in the background.
+| 0.8 | Repeating tasks (`every:`) | `repeat` |
+| 0.8 | Reminders (`t notify`, timer install, `on_remind` hook) | `reminders` |
 
 ## 0.9: Easy to start, pleasant to use
 

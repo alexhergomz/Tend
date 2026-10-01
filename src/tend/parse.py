@@ -1,6 +1,6 @@
 """Quick-add syntax: plain words form the title, tokens set fields.
 
-    +goal  due:fri  aim:fri  after:mon  v:1..3  e:45m  s:S|M|L  @high @low
+    +goal  due:fri  aim:fri  after:mon  v:1..3  e:45m  s:S|M|L  @high @low  every:mon
 
 `!2` and `~45m` also work, but zsh expands them unless they're inside quotes.
 """
@@ -8,6 +8,8 @@
 import calendar
 import re
 from datetime import date, timedelta
+
+from . import repeat
 
 WEEKDAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
@@ -32,6 +34,8 @@ def parse_date(text: str, today: date) -> date:
         for i, name in enumerate(WEEKDAYS):
             if name.startswith(s):
                 return today + timedelta(days=(i - today.weekday()) % 7)
+    if m := re.fullmatch(r"(\d{1,2})(st|nd|rd|th)", s):  # the next 1st, 15th, ...
+        return repeat.parse(s).first(today)
     if m := re.fullmatch(r"\+?(\d+)([dw])", s):
         n = int(m[1]) * (7 if m[2] == "w" else 1)
         return today + timedelta(days=n)
@@ -81,6 +85,14 @@ def parse_tokens(args: list[str], today: date) -> tuple[str, dict]:
         elif m := re.fullmatch(r"(due|aim|after):(.*)", w, re.I):
             key = {"due": "due", "aim": "aim", "after": "start_after"}[m[1].lower()]
             f[key] = None if m[2].lower() in CLEAR else parse_date(m[2], today)
+        elif m := re.fullmatch(r"every:(\S+)", w, re.I):
+            if m[1].lower() in CLEAR:
+                f["repeat"] = None
+            else:
+                try:
+                    f["repeat"] = repeat.parse(m[1]).text
+                except repeat.RuleError as e:
+                    raise ParseError(str(e)) from None
         elif m := re.fullmatch(r"@(high|low|any)", w, re.I):
             f["energy"] = None if m[1].lower() == "any" else m[1].lower()
         elif m := re.fullmatch(r"(?:!|v:)([123])", w):

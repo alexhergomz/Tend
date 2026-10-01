@@ -37,6 +37,7 @@ COMMANDS = [
     ("w", "wins", "what you got done today  (--week)"),
     ("i", "stats", "how your plans usually go: time, dates, push-backs"),
     ("u", "undo", "undo the last change"),
+    ("", "notify", "send new reminders  (--install sets up a timer, --test)"),
     ("", "backup", "save a copy of your data now (one is made every day)"),
     ("", "restore", "list copies, or go back to one:  t restore 2"),
     ("", "export", "all data as JSON lines:  t export tasks.jsonl"),
@@ -68,6 +69,8 @@ def meta(t: Task, today: date, warn_due: bool = False) -> Text:
         parts.append((f"aim {fmt.day(t.aim, today)}", DIM))
     if t.energy:
         parts.append((f"@{t.energy}", DIM))
+    if t.repeat:
+        parts.append((f"↻ {t.repeat.replace(',', ' ')}", DIM))
     if t.pushes >= 2:
         parts.append((f"pushed {t.pushes}×", DIM))
     if not t.triaged:
@@ -153,6 +156,7 @@ def help_screen(config_path, data_path, shown=lambda name: True, extensions: boo
         "+goal   due:<date> hard deadline   aim:<date> soft target   after:<date> hide until",
         "v:1..3 value (nice to have · matters · really matters)   s:S|M|L size   e:45m estimate",
         "@high / @low energy: hard work goes in high-energy hours   ·   @any clears",
+        "every:mon every:mon,thu every:day every:weekday every:2w every:month every:1st every:last   ·   every:none stops",
         "dates: today tom fri +3d +2w oct20 10-20 2026-10-20 eow eom   ·   due:none clears",
         "--json on any command prints machine-readable output",
     ):

@@ -17,6 +17,8 @@ FEATURES = {
     "plugins": ("0.4", "t-<name> programs run as t <name>", ["plugins"]),
     "energy": ("0.5", "energy windows and @high / @low tasks", []),
     "states": ("0.6", "started and waiting states", ["start", "wait", "status"]),
+    "repeat": ("0.8", "repeating tasks (every:mon)", []),
+    "reminders": ("0.8", "desktop reminders from a timer", ["notify"]),
 }
 OWNER = {cmd: name for name, (_, _, cmds) in FEATURES.items() for cmd in cmds}
 

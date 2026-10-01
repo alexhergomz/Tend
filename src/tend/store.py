@@ -34,7 +34,9 @@ CREATE TABLE IF NOT EXISTS tasks (
     first_aim    TEXT,             -- first soft target, kept when the date moves
     pushes       INTEGER NOT NULL DEFAULT 0, -- times a date moved later
     stage        TEXT NOT NULL DEFAULT 'todo' CHECK (stage IN ('todo', 'started', 'waiting')),
-    started_at   TEXT              -- first time work started
+    started_at   TEXT,             -- first time work started
+    repeat       TEXT,             -- repeat rule, as in every:mon
+    series       INTEGER           -- first task of a repeating series
 );
 CREATE TABLE IF NOT EXISTS goals (
     name       TEXT PRIMARY KEY,
@@ -60,7 +62,7 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 """
-VERSION = 3
+VERSION = 4
 NEW_COLUMNS = {
     # version 2
     "energy": "TEXT CHECK (energy IN ('high', 'low'))",
@@ -70,13 +72,16 @@ NEW_COLUMNS = {
     # version 3
     "stage": "TEXT NOT NULL DEFAULT 'todo' CHECK (stage IN ('todo', 'started', 'waiting'))",
     "started_at": "TEXT",
+    # version 4
+    "repeat": "TEXT",
+    "series": "INTEGER",
 }
 DEFAULTS = {"pushes": 0, "slips": 0, "stage": "todo"}
 
 COLS = [
     "id", "title", "goal", "parent", "value", "size", "estimate_min", "due", "aim",
     "start_after", "status", "slips", "skip_date", "created", "done_at",
-    "energy", "first_due", "first_aim", "pushes", "stage", "started_at",
+    "energy", "first_due", "first_aim", "pushes", "stage", "started_at", "repeat", "series",
 ]
 NOT_UNDOABLE = ("rollover",)  # automatic changes, skipped by undo
 BARRIERS = ("import", "restore")  # undo stops here: these are undone with t restore

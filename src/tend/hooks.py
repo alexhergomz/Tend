@@ -6,7 +6,8 @@ the background, so it can never slow tend down or change what tend does. Output
 goes to hooks.log next to the database.
 
 Events: on_add, on_done, on_drop, on_skip, on_status (with old and new state),
-on_focus_start, on_focus_end, on_review, and on_change, which runs for every
+on_focus_start, on_focus_end, on_review, on_remind (title, body), and
+on_change, which runs for every
 change with before/after rows.
 """
 
@@ -19,7 +20,7 @@ from pathlib import Path
 from . import __version__, config
 
 EVENTS = ("on_add", "on_done", "on_drop", "on_skip", "on_status", "on_focus_start", "on_focus_end",
-          "on_review", "on_change")
+          "on_review", "on_remind", "on_change")
 _running: list[subprocess.Popen] = []
 
 

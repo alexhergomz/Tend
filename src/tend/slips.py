@@ -31,12 +31,13 @@ def why(t: Task, today: date) -> str:
     return f"soft target slipped {t.slips + 1} times"
 
 
-def wake_waiting(store: Store, today: date):
-    """Waiting tasks with a date go back to todo on that date."""
+def wake_waiting(store: Store, today: date) -> list[Task]:
+    """Waiting tasks with a date go back to todo on that date. Returns them."""
     due = [t for t in store.tasks() if t.stage == "waiting" and t.start_after and t.start_after <= today]
     if not due:
-        return
+        return []
     with store.event("rollover", f"{len(due)} waiting task(s) back to todo"):
         for t in due:
             t.stage, t.start_after = "todo", None
             store.update(t)
+    return due

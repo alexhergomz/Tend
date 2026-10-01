@@ -1,6 +1,6 @@
 # Data reference
 
-**Version 1** · database schema 3 · export format 1 · tend 0.7
+**Version 1** · database schema 4 · export format 1 · tend 0.8
 
 This page describes everything a plugin, hook or script can rely on: the
 database, the JSON output, the export format, hook payloads and the plugin
@@ -41,6 +41,8 @@ when you can: they keep the history in `events` and undo working.
 | `first_aim` | date | The first soft target it ever had |
 | `pushes` | integer | How many times a date moved later. Never reset |
 | `started_at` | time | The first time it was started |
+| `repeat` | text | Repeat rule, as written after `every:` (`mon,thu`, `2w`, `1st`) |
+| `series` | integer | For copies of a repeating task: the id of the first one |
 
 A person sees one **state**: `stage` while `status` is `open`, else `status`.
 
@@ -99,6 +101,7 @@ Add `--json` to any command. Times are ISO strings.
 | `t features` | Each feature with `on`, `since`, `what`, `commands` |
 | `t plugins` | `{"plugins", "hooks"}` |
 | `t restore` | A list of copies with `n`, `path`, `kind`, `made`, `open_tasks` |
+| `t notify` | `{"quiet", "reminders"}`, each reminder with `key`, `title`, `body`, `task_id`. Shows what is pending, sends nothing |
 
 A **ranked task** is a task row plus:
 
@@ -157,6 +160,7 @@ and one JSON object on stdin:
 | `on_focus_start` | `task`, `mode` |
 | `on_focus_end` | `task`, `mode`, `minutes`, `outcome` (`done` or `stop`) |
 | `on_review` | none (`task` is `null`) |
+| `on_remind` | `task` (or `null`), `title`, `body`, `key` |
 | `on_change` | `kind`, `summary`, `changes` (as in `events`) |
 
 Hooks run in the background, after the change is saved. Their output goes to

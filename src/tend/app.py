@@ -46,7 +46,7 @@ class App:
         self.today = date.today()
         self.__dict__.pop("_corrections", None)
         slips.roll_over(self.store, self.today, self.cfg["slips"]["quiet_rollovers"])
-        slips.wake_waiting(self.store, self.today)
+        self.woken = slips.wake_waiting(self.store, self.today)
 
     @property
     def week_start(self) -> date:
@@ -70,6 +70,8 @@ class App:
             tasks = [replace(t, stage="todo") for t in tasks]
         if not self.on("energy"):
             tasks = [replace(t, energy=None) for t in tasks]
+        if not self.on("repeat"):
+            tasks = [replace(t, repeat=None) for t in tasks]
         return tasks
 
     @property
