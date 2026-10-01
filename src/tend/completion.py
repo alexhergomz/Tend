@@ -17,12 +17,13 @@ TOKENS = [("due:", "hard deadline"), ("aim:", "soft target"), ("after:", "hide u
 STATES = ["todo", "started", "waiting", "done", "dropped"]
 
 SCRIPTS = {
-    "bash": r"""# Tend completion for bash. Add to ~/.bashrc:  eval "$(t completion bash)"
+    "bash": r"""# Tend completion for bash (3.2 or newer). Add to ~/.bashrc:  eval "$(t completion bash)"
 _tend_complete() {
-    local line="${COMP_LINE:0:COMP_POINT}" cur="" c
+    local line="${COMP_LINE:0:COMP_POINT}" cur="" c n
     local -a words
     read -ra words <<< "$line"
-    if [[ "$line" != *" " ]]; then cur="${words[-1]}"; unset 'words[-1]'; fi
+    n=${#words[@]}
+    if [[ "$line" != *" " ]]; then cur="${words[n-1]}"; unset "words[n-1]"; fi
     local IFS=$'\n'
     COMPREPLY=()
     for c in $("${words[0]}" _complete "${words[@]:1}" "$cur" 2>/dev/null | cut -f1); do
@@ -30,7 +31,7 @@ _tend_complete() {
         COMPREPLY+=("$c")
     done
 }
-complete -o default -o nosort -F _tend_complete t tend
+complete -o default -F _tend_complete t tend
 """,
     "zsh": r"""# Tend completion for zsh. Add to ~/.zshrc, after compinit:  source <(t completion zsh)
 _tend() {
