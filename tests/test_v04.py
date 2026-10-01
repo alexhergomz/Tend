@@ -14,7 +14,7 @@ from tend.energy import allowed, at, parse as parse_windows, split
 from tend.model import Task
 from tend.plan import schedule
 from tend.priority import rank
-from tend.store import Store
+from tend.store import VERSION, Store
 
 TODAY = date(2026, 9, 29)
 
@@ -43,7 +43,7 @@ def test_migration_adds_columns_and_backfills_from_events(tmp_path):
 
     t = Store(db).task(1)
     assert (t.first_aim, t.aim, t.pushes) == (date(2026, 9, 25), date(2026, 9, 28), 2)
-    assert Store(db).db.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert Store(db).db.execute("PRAGMA user_version").fetchone()[0] == VERSION
 
 
 def test_update_tracks_first_date_and_pushes(tmp_path):

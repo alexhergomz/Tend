@@ -101,6 +101,45 @@ go to the end of the queue.
 There are no hidden weights to tune. The only settings are the focus hours per
 day (default 4) and the slack limit for rule 1 (default 1 day).
 
+## Task states
+
+Every task is in one of five states:
+
+```
+todo ──► started ──► done
+  │         │
+  └──► waiting      dropped (from any state)
+```
+
+| State | Meaning | How to set it |
+|---|---|---|
+| `todo` | Not started yet. New tasks start here. | `t status 4 todo` |
+| `started` | You are working on it. | `t start 4` (key `b`). `t focus` does it for you. |
+| `waiting` | Blocked by someone or something else. | `t wait 4` or `t wait 4 mon` (key `h`) |
+| `done` | Finished. | `t done 4` (key `d`) |
+| `dropped` | You decided not to do it. | `t drop 4` (key `k`) |
+
+`t status <id> <state>` sets any state. Without an id, the commands act on the
+task that `t next` showed.
+
+**Started tasks win ties.** When two tasks have the same score, the started one
+comes first. Finishing work in progress before starting more is a core idea of
+Kanban (a "WIP limit"). If more than 3 tasks are started at once, the status
+line shows a warning. Change the limit with `max_started` in the config.
+
+**Waiting tasks leave the queue,** so `t next` and `t plan` skip them. They are
+not forgotten:
+
+- With a date (`t wait 4 mon`), the task goes back to `todo` on that day by itself.
+- Without a date, it is listed under **Waiting** at the end of `t ls`, and the
+  weekly review asks about it.
+- If its hard deadline is at risk, it comes back into the queue (rule 1) with
+  the note "marked waiting". Deadlines always win.
+
+Splitting a task and starting one of its steps also starts the original task.
+
+![Starting a task, putting one on hold, and the queue](docs/states.gif)
+
 ## Missed dates
 
 tend has two kinds of date:
@@ -220,13 +259,14 @@ All corrections use the same simple model:
 | **Soft dates** | days between the *first* soft target and the day the task was done | Soft targets count as that many days earlier, so they get urgent sooner. | 0 to 7 days |
 | **Deadlines** | the same, for the *first* hard deadline | Rule 1 warns that many days earlier. | 0 to 7 days |
 | **Push-backs** | how many times a task's date moved to a later day | None. Shown only. | – |
+| **Start to done** | days from `started` to `done` | None. Shown only. | – |
 
 The date corrections use the first date a task had. If you move a date, the
 original still counts, so moving dates doesn't hide lateness. Finishing early
 never moves your dates later.
 
-Push-backs have no correction, because there is no simple model that uses them
-reliably. The data is there for plugins: `tasks.pushes`, `tasks.first_due`,
+Push-backs and start-to-done time have no correction, because there is no
+simple model that uses them reliably. The data is there for plugins: `tasks.pushes`, `tasks.first_due`,
 `tasks.first_aim`, the full history in `events`, and `t stats --json`. After a
 task is pushed twice, its line shows `pushed 2×`.
 
@@ -256,15 +296,17 @@ fit anywhere.
 ## Weekly review
 
 Once a week, the status line shows `weekly review due`. Run `t review` (key `v`).
-It takes about five minutes and has six steps:
+It takes about five minutes and has seven steps:
 
 1. **Last 7 days:** what you finished, and each goal against its target.
 2. **How your plans usually go:** the same numbers as `t stats`.
 3. **Inbox:** triage new tasks now, or skip.
 4. **Slipped tasks:** resolve them now, or skip.
-5. **Old tasks:** tasks older than 30 days, with no date and no focus time.
+5. **Waiting:** for each task waiting without a date: still waiting, back to
+   the queue, done, or drop.
+6. **Old tasks:** tasks older than 30 days, with no date and no focus time.
    Keep them, give them a date, or drop them.
-6. **Goals:** if a goal has no open tasks, rule 2 can't help it. tend asks you
+7. **Goals:** if a goal has no open tasks, rule 2 can't help it. tend asks you
    for one small next step.
 
 Press `q` at any question to stop.
@@ -280,6 +322,7 @@ mode (`t` with no arguments), you only press the letter.
 |---|---|---|
 | `n` | `next` | Show the one task to do now (`--low`, `--high` for your energy now) |
 | `f` | `focus` | Start the focus timer (`--pomo`, `--flow`, `--box 45`) |
+| `b` | `start` | Mark the task as started |
 | `d` | `done` | Mark the task as done |
 | `s` | `skip` | Skip the task for today |
 | `x` | `split` | Split the task into smaller steps: `t x "outline" "draft intro"` |
@@ -287,7 +330,9 @@ mode (`t` with no arguments), you only press the letter.
 | `t` | `triage` | Sort the inbox |
 | `l` | `ls` | Show the full queue with reasons |
 | `e` | `edit` | Change a task: `t e 12 due:fri v:3` |
+| `h` | `wait` | Put the task on hold: `t wait 4 mon` |
 | `k` | `drop` | Remove a task you no longer need |
+| | `status` | Set any state: `t status 4 todo` |
 | `r` | `resolve` | Decide what to do with slipped tasks |
 | `p` | `plan` | Show today's schedule (`--ics` exports it) |
 | `c` | `gantt` | Show the next 7 days as a chart (`--days 14`) |
@@ -364,6 +409,7 @@ To run several hooks for one event, put them in a folder instead, such as
 | `on_done` | a task was finished |
 | `on_drop` | a task was dropped |
 | `on_skip` | a task was skipped |
+| `on_status` | a task changed state (with `old` and `new`) |
 | `on_focus_start` | a focus session started |
 | `on_focus_end` | a focus session ended (with `minutes` and `outcome`) |
 | `on_review` | the weekly review was finished |
@@ -386,7 +432,7 @@ All data is in one SQLite file. Run `t ?` to see its path. By default it is
 
 | Table | Contents |
 |---|---|
-| `tasks` | All tasks, including done and dropped ones. `first_due`, `first_aim` and `pushes` keep the date history. |
+| `tasks` | All tasks, including done and dropped ones. `status` is `open`, `done` or `dropped`. For open tasks, `stage` is `todo`, `started` or `waiting`. `started_at`, `first_due`, `first_aim` and `pushes` keep the history. |
 | `goals` | Goals and their weekly targets, in minutes |
 | `sessions` | Focus timer sessions |
 | `events` | Every change, with a copy of the task before and after. Undo uses this table. |
@@ -417,6 +463,7 @@ flow_break_ratio = 0.2
 hours_per_day = 4         # focused hours per day, used to compute slack
 at_risk_slack_days = 1    # rule 1 limit
 calibrate = true          # learn time and date corrections from finished tasks
+max_started = 3           # warn when more tasks than this are started at once
 
 [schedule]
 day_start = "09:00"       # t plan only books time inside this window
@@ -479,5 +526,6 @@ ffmpeg.
 - **0.3:** `t plan`, `t gantt`, calendar import and `.ics` export
 - **0.4:** hooks and plugins
 - **0.5:** energy windows, date corrections, push-back data
+- **0.6:** task states: todo, started, waiting, done, dropped
 
 The core is meant to stay small. New ideas should start as plugins.

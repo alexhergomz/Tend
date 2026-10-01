@@ -2,11 +2,12 @@ from datetime import datetime, timedelta
 
 from rich.markup import escape
 from rich.padding import Padding
+from rich.text import Text
 
 from . import config, fmt, hooks, keys, parse, slips, ui, views
 from . import focus as focus_timer
 from .app import App, UsageError
-from .model import Task
+from .model import STATES, Task
 from .store import now_iso
 from .ui import ACCENT, DIM, WARN, console
 
@@ -63,6 +64,8 @@ def cmd_focus(app: App, args):
         return app.say(f" [{DIM}]Nothing to focus on.[/]")
     if not keys.interactive():
         raise UsageError("focus needs an interactive terminal")
+    if t.stage != "started":
+        _set_stage(app, t, "started", quiet=True)
     start = datetime.now()
     app.hook("on_focus_start", t, mode=mode)
     result = focus_timer.run(t.title, ui.meta(t, app.today), mode, app.cfg, box_min)
@@ -89,6 +92,7 @@ def _complete(app: App, t: Task):
             parent = app.store.task(parent.parent) if parent.parent else None
     app.store.set_meta("current", None)
     app.hook("on_done", app.store.task(t.id))
+    app.hook("on_status", app.store.task(t.id), old=t.stage, new="done")
     n = len(app.store.done_since(app.today))
     app.say(f" [{ACCENT}]✓[/] {_t(t)}  [{DIM}]{n} done today[/]")
 
@@ -207,6 +211,85 @@ def cmd_edit(app: App, args):
     app.bar("list")
 
 
+# ── status ──────────────────────────────────────────────────────────────
+def _set_stage(app: App, t: Task, stage: str, until=None, quiet: bool = False):
+    old = t.stage
+    with app.store.event("status", f"{stage} #{t.id} {t.title}"):
+        t.stage = stage
+        t.start_after = until if stage == "waiting" else (None if old == "waiting" else t.start_after)
+        if stage == "started" and not t.started_at:
+            t.started_at = now_iso()
+        app.store.update(t)
+        parent = app.store.task(t.parent) if t.parent else None
+        if stage == "started" and parent and parent.stage == "todo":
+            parent.stage, parent.started_at = "started", parent.started_at or now_iso()
+            app.store.update(parent)
+    app.hook("on_status", t, old=old, new=stage)
+    if stage == "started" and not quiet:
+        app.say(f" [{ACCENT}]▸[/] started {_t(t)}")
+        limit = app.cfg["priority"]["max_started"]
+        n = sum(1 for x in app.store.tasks() if x.stage == "started" and x.id not in app.store.blocked_ids())
+        if n > limit:
+            app.say(f" [{WARN}]{n} tasks are started.[/] [{DIM}]Finishing one before starting more usually goes faster.[/]")
+    elif stage == "waiting":
+        when = f" until {fmt.day(until, app.today)}" if until else ""
+        back = f"back in the queue {fmt.day(until, app.today)}" if until else "t ls shows it"
+        app.say(f" [{DIM}]⏸ waiting{when}:[/] {escape(t.title)} [{DIM}]· {back}[/]")
+    elif stage == "todo" and not quiet:
+        app.say(f" [{DIM}]○ back to todo:[/] {escape(t.title)}")
+
+
+def cmd_start(app: App, args):
+    t = app.target(args)
+    if not t:
+        return app.say(f" [{DIM}]Nothing to start.[/]")
+    if t.stage == "started":
+        app.say(f" [{DIM}]Already started:[/] {escape(t.title)}")
+    else:
+        _set_stage(app, t, "started")
+    if app.json:
+        return app.emit(app.store.task(t.id).to_json())
+    app.bar("next")
+
+
+def cmd_wait(app: App, args):
+    ids = [a for a in args[:1] if a.lstrip("#").isdigit()]
+    rest = args[len(ids):]
+    t = app.target(ids)
+    if not t:
+        return app.say(f" [{DIM}]Nothing to put on hold.[/]")
+    text = " ".join(rest)
+    if not rest and app.tui:
+        text = ui.ask(f" {t.title} is waiting until? (a date, or enter for no date) › ")
+    until = parse.parse_date(text, app.today) if text else None
+    _set_stage(app, t, "waiting", until)
+    if app.json:
+        return app.emit(app.store.task(t.id).to_json())
+    app.bar("next")
+
+
+def cmd_status(app: App, args):
+    states = [a for a in args if a in STATES]
+    ids = [a for a in args if a.lstrip("#").isdigit()]
+    if not states:
+        raise UsageError("usage: t status [id] todo|started|waiting|done|dropped")
+    t = app.target(ids)
+    if not t:
+        return app.say(f" [{DIM}]No open task.[/]")
+    state = states[0]
+    if state == "done":
+        _complete(app, t)
+    elif state == "dropped":
+        _drop(app, t)
+    elif state == t.stage:
+        app.say(f" [{DIM}]Already {state}:[/] {escape(t.title)}")
+    else:
+        _set_stage(app, t, state)
+    if app.json:
+        return app.emit(app.store.task(t.id).to_json())
+    app.bar("next")
+
+
 def _drop(app: App, t: Task):
     with app.store.event("drop", f"drop #{t.id} {t.title}"):
         stack = [t]
@@ -217,6 +300,7 @@ def _drop(app: App, t: Task):
             stack.extend(app.store.children(cur.id))
     app.store.set_meta("current", None)
     app.hook("on_drop", t)
+    app.hook("on_status", t, old=t.stage, new="dropped")
     app.say(f" [{DIM}]let go:[/] {escape(t.title)} [{DIM}]· u to undo[/]")
 
 
@@ -340,6 +424,11 @@ def cmd_ls(app: App, args):
         app.say(f" [{DIM}]Nothing open.[/]")
         return app.bar("empty")
     ui.queue(ranked, app.today)
+    waiting = [t for t in app.store.tasks() if t.stage == "waiting" and t.id not in {r.task.id for r in ranked}]
+    if waiting:
+        console.print(f"\n [bold]Waiting[/] [{DIM}]· not in the queue · t start <id> brings one back[/]")
+        for t in waiting:
+            console.print(Text("   ") + Text(t.title) + Text("  ") + ui.meta(t, app.today))
     app.bar("list")
 
 
@@ -497,10 +586,26 @@ def _review(app: App, since):
     if not offer(4, "Slipped tasks", slipped, cmd_resolve, f"task{'s' * (slipped != 1)} to resolve"):
         return
 
-    step(5, "Old tasks")
+    step(5, "Waiting")
+    waiting = [t for t in app.store.tasks() if t.stage == "waiting" and not t.start_after]
+    if not waiting:
+        console.print(f"   [{DIM}]No task is waiting without a date.[/]")
+    for t in waiting:
+        console.print(f"   {_t(t)} [{DIM}]waiting, no date[/]")
+        k = ui.choose("  ", {"enter": "still waiting", "b": "back to the queue", "d": "done", "k": "drop", "q": "stop"})
+        if k == "q":
+            return
+        if k == "b":
+            _set_stage(app, t, "todo")
+        elif k == "d":
+            _complete(app, t)
+        elif k == "k":
+            _drop(app, t)
+
+    step(6, "Old tasks")
     logged = app.store.logged_by_task()
     cutoff = (app.today - timedelta(days=30)).isoformat()
-    old = [t for t in app.store.tasks() if t.created[:10] < cutoff and not t.due and not t.aim
+    old = [t for t in app.store.tasks() if t.created[:10] < cutoff and not t.due and not t.aim and t.stage == "todo"
            and not logged.get(t.id) and t.id not in app.store.blocked_ids()]
     if not old:
         console.print(f"   [{DIM}]Nothing older than 30 days without a date.[/]")
@@ -522,7 +627,7 @@ def _review(app: App, since):
                 t.aim = when
                 app.store.update(t)
 
-    step(6, "Goals")
+    step(7, "Goals")
     open_by_goal: dict[str, int] = {}
     for t in app.store.tasks():
         if t.goal:
@@ -562,6 +667,9 @@ def _corrections(app: App, indent: str = " "):
                     f"done {fmt.days(-late)} before the first date" if late < 0 else "done on the first date")
             use = f"{date_word} count as {fmt.days(shift.days)} earlier" if shift.days else "no change needed"
         rows.append((label, what, shift.samples, use))
+    if c.cycle.samples:
+        rows.append(("Start to done", f"median {fmt.days(c.cycle.median_days)} from start to done",
+                     c.cycle.samples, "data only, for plugins"))
     p = c.pushes
     if p.dated:
         what = f"{p.pushed} of {p.dated} dated tasks pushed back" + (f", {p.average:.1f}× each" if p.pushed else "")
@@ -613,6 +721,7 @@ def cmd_help(app: App, args):
 COMMANDS = {
     "next": cmd_next, "focus": cmd_focus, "done": cmd_done, "skip": cmd_skip, "split": cmd_split,
     "add": cmd_add, "triage": cmd_triage, "ls": cmd_ls, "edit": cmd_edit, "drop": cmd_drop,
+    "start": cmd_start, "wait": cmd_wait, "status": cmd_status,
     "resolve": cmd_resolve, "plan": cmd_plan, "gantt": cmd_gantt, "review": cmd_review,
     "goals": cmd_goals, "wins": cmd_wins, "stats": cmd_stats, "plugins": cmd_plugins,
     "undo": cmd_undo, "help": cmd_help,

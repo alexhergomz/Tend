@@ -29,3 +29,14 @@ def why(t: Task, today: date) -> str:
     if t.due and t.due < today:
         return f"hard deadline was {fmt.day(t.due, today)}"
     return f"soft target slipped {t.slips + 1} times"
+
+
+def wake_waiting(store: Store, today: date):
+    """Waiting tasks with a date go back to todo on that date."""
+    due = [t for t in store.tasks() if t.stage == "waiting" and t.start_after and t.start_after <= today]
+    if not due:
+        return
+    with store.event("rollover", f"{len(due)} waiting task(s) back to todo"):
+        for t in due:
+            t.stage, t.start_after = "todo", None
+            store.update(t)

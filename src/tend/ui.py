@@ -19,6 +19,7 @@ ACCENT, WARN, DIM = "cyan", "yellow", "grey50"
 COMMANDS = [
     ("n", "next", "the one thing to do now  (--low · --high energy)"),
     ("f", "focus", "focus timer on it  (--pomo · --flow · --box 45)"),
+    ("b", "start", "mark it started (focus does this too)"),
     ("d", "done", "mark it done"),
     ("s", "skip", "skip it for today, no questions asked"),
     ("x", "split", "break it into smaller steps"),
@@ -26,6 +27,7 @@ COMMANDS = [
     ("t", "triage", "sort the inbox, 3 quick questions each"),
     ("l", "ls", "the whole queue, in order, with reasons"),
     ("e", "edit", "change a task:  t e 12 due:fri v:3"),
+    ("h", "wait", "on hold, waiting for someone:  t wait 12 mon"),
     ("k", "drop", "let a task go"),
     ("r", "resolve", "decide what to do with slipped tasks"),
     ("p", "plan", "today's schedule, built with the same rules"),
@@ -46,6 +48,10 @@ def say(msg: str):
 
 def meta(t: Task, today: date, warn_due: bool = False) -> Text:
     parts: list[tuple[str, str]] = [(f"#{t.id}", DIM)]
+    if t.status == "open" and t.stage == "started":
+        parts.append(("started", ACCENT))
+    elif t.status == "open" and t.stage == "waiting":
+        parts.append((f"waiting until {fmt.day(t.start_after, today)}" if t.start_after else "waiting", WARN))
     if t.goal:
         parts.append((t.goal, DIM))
     if t.estimate_min:
@@ -84,6 +90,8 @@ def status_line(counts: dict):
         parts.append(f"[{WARN}]⚑ {counts['at_risk']} deadline{'s' * (counts['at_risk'] > 1)} at risk[/]")
     if counts.get("slipped"):
         parts.append(f"[{WARN}]{counts['slipped']} slipped[/]")
+    if counts.get("too_many_started"):
+        parts.append(f"[{WARN}]{counts['started']} started[/]")
     if counts.get("inbox"):
         parts.append(f"[{DIM}]{counts['inbox']} in inbox[/]")
     if counts.get("review"):
@@ -93,12 +101,22 @@ def status_line(counts: dict):
 
 
 def footer(keys: list[str], cli: bool = True):
+    """One line of keys. If it doesn't fit, keys are dropped from the end (help and quit stay)."""
+    keys = list(keys)
+
+    def build(ks):
+        line = Text(" t ▸ " if cli else " ", style=DIM)
+        for k in ks:
+            line.append(k, f"bold {ACCENT}")
+            line.append(f" {LABELS.get(k, k)}  ", DIM)
+        return line
+
+    keep = [k for k in ("?", "q") if k in keys]
+    while len(build(keys).plain.rstrip()) > console.width - 1 and len(keys) > len(keep) + 1:
+        drop = next(i for i in range(len(keys) - 1, -1, -1) if keys[i] not in keep)
+        keys.pop(drop)
     console.print(Rule(style=DIM))
-    line = Text(" t ▸ " if cli else " ", style=DIM)
-    for k in keys:
-        line.append(k, f"bold {ACCENT}")
-        line.append(f" {LABELS.get(k, k)}  ", DIM)
-    console.print(line)
+    console.print(build(keys))
 
 
 def queue(ranked: list[Ranked], today: date):

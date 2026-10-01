@@ -5,6 +5,8 @@ SIZES = {"S": 1, "M": 2, "L": 3}  # WSJF denominator
 SIZE_MINUTES = {"S": 30, "M": 120, "L": 240}  # assumed effort when no estimate is given
 DATE_FIELDS = ("due", "aim", "start_after", "skip_date", "first_due", "first_aim")
 ENERGY = ("high", "low")
+STAGES = ("todo", "started", "waiting")  # where an open task is
+STATES = STAGES + ("done", "dropped")  # what people see: stage while open, else status
 
 
 @dataclass
@@ -28,6 +30,13 @@ class Task:
     first_due: date | None = None  # the first hard deadline this task had
     first_aim: date | None = None  # the first soft target this task had
     pushes: int = 0  # times a date moved later, never reset
+    stage: str = "todo"  # todo / started / waiting, while status is open
+    started_at: str | None = None  # first time work started
+
+    @property
+    def state(self) -> str:
+        """One word for people: todo, started, waiting, done or dropped."""
+        return self.stage if self.status == "open" else self.status
 
     @property
     def triaged(self) -> bool:

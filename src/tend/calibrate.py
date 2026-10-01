@@ -8,6 +8,7 @@ time   actual focus time / estimate            → scales estimates
 soft   days finished after the first soft date  → soft dates count as earlier
 hard   days finished after the first deadline   → rule 1 warns earlier
 
+Start to done (days from `t start` to done) is shown and stored, not used.
 Push-backs (how often dates move later) are measured and shown, but there is
 no simple model that uses them reliably. They stay in the data for plugins:
 tasks.pushes, or `t stats --json`.
@@ -56,11 +57,18 @@ class Pushes:
 
 
 @dataclass
+class Cycle:
+    median_days: float | None  # median days from started to done
+    samples: int
+
+
+@dataclass
 class Corrections:
     time: Calibration
     soft: Shift
     hard: Shift
     pushes: Pushes
+    cycle: Cycle
 
     def to_json(self) -> dict:
         return {
@@ -69,6 +77,7 @@ class Corrections:
                      "samples": self.soft.samples, "active": self.soft.active},
             "hard": {"shift_days": self.hard.days, "median_late_days": self.hard.median_late,
                      "samples": self.hard.samples, "active": self.hard.active},
+            "start_to_done": {"median_days": self.cycle.median_days, "samples": self.cycle.samples},
             "pushes": {"dated": self.pushes.dated, "pushed": self.pushes.pushed,
                        "average": round(self.pushes.average, 2),
                        "top": [{"id": i, "title": t, "pushes": n} for i, t, n in self.pushes.top]},
@@ -137,6 +146,16 @@ def pushes(store: Store) -> Pushes:
                   [(r["id"], r["title"], r["pushes"]) for r in top])
 
 
+def cycle(store: Store) -> Cycle:
+    """Days from the first start to done. Shown only: the data is for plugins."""
+    rows = store.db.execute(
+        "SELECT started_at, done_at FROM tasks WHERE status = 'done' AND started_at IS NOT NULL "
+        "ORDER BY done_at DESC LIMIT ?", (RECENT,)).fetchall()
+    days = [(datetime.fromisoformat(r["done_at"]) - datetime.fromisoformat(r["started_at"])).total_seconds() / 86400
+            for r in rows]
+    return Cycle(round(median(days), 1) if days else None, len(days))
+
+
 def load(store: Store, enabled: bool = True) -> Calibration:
     if not enabled:
         return Calibration(1.0, 0)
@@ -145,10 +164,11 @@ def load(store: Store, enabled: bool = True) -> Calibration:
 
 def corrections(store: Store, enabled: bool = True) -> Corrections:
     if not enabled:
-        return Corrections(Calibration(1.0, 0), Shift(0, None, 0), Shift(0, None, 0), pushes(store))
+        return Corrections(Calibration(1.0, 0), Shift(0, None, 0), Shift(0, None, 0), pushes(store), cycle(store))
     return Corrections(
         time=from_ratios(ratios(store)),
         soft=from_lateness(lateness(store, "first_aim")),
         hard=from_lateness(lateness(store, "first_due")),
         pushes=pushes(store),
+        cycle=cycle(store),
     )

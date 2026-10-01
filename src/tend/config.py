@@ -16,6 +16,7 @@ DEFAULTS = {
         "hours_per_day": 4,  # realistic focused hours per day, used for slack
         "at_risk_slack_days": 1,  # rule 1 threshold
         "calibrate": True,  # learn time and date corrections from finished tasks
+        "max_started": 3,  # warn when more tasks than this are started at once
     },
     "schedule": {
         "day_start": "09:00",
@@ -57,6 +58,7 @@ flow_break_ratio = 0.2    # flow mode: break earned = 20% of time worked
 hours_per_day = 4         # realistic focused hours per day (used to compute slack)
 at_risk_slack_days = 1    # rule 1: a deadline with this much slack or less comes first
 calibrate = true          # learn time and date corrections from finished tasks
+max_started = 3           # warn when more tasks than this are started at once
 
 [schedule]
 day_start = "09:00"       # t plan only books time inside this window

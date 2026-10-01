@@ -7,7 +7,7 @@ from .store import Store
 
 # Footer keys for each context. "t" (triage) and "r" (resolve) are added when relevant.
 FOOTERS = {
-    "next": ["f", "d", "s", "x", "a"],
+    "next": ["f", "d", "b", "s", "x", "h", "a"],
     "added": ["n", "a", "u"],
     "done": ["n", "w", "u"],
     "list": ["n", "p", "a", "e"],
@@ -38,6 +38,7 @@ class App:
         self.today = date.today()
         self.__dict__.pop("_corrections", None)
         slips.roll_over(self.store, self.today, self.cfg["slips"]["quiet_rollovers"])
+        slips.wake_waiting(self.store, self.today)
 
     @property
     def week_start(self) -> date:
@@ -128,17 +129,17 @@ class App:
             "slipped": len(self.slipped()),
             "inbox": sum(1 for t in open_tasks if not t.triaged),
             "review": self.review_due(),
+            "started": (started := sum(1 for t in open_tasks if t.stage == "started"
+                                       and t.id not in self.store.blocked_ids())),
+            "too_many_started": started > self.cfg["priority"]["max_started"],
         }
 
     def footer_keys(self, ctx: str, counts: dict) -> list[str]:
-        keys = list(FOOTERS[ctx])
-        if counts["slipped"] and "r" not in keys:
-            keys.append("r")
-        if counts["inbox"] and "t" not in keys:
-            keys.append("t")
-        if counts.get("review") and "v" not in keys:
-            keys.append("v")
-        return keys + ["?"]
+        """Base keys for the context, with alerts after the first three so they survive trimming."""
+        base = list(FOOTERS[ctx])
+        alerts = [k for k, on in (("r", counts["slipped"]), ("t", counts["inbox"]), ("v", counts.get("review")))
+                  if on and k not in base]
+        return base[:3] + alerts + base[3:] + ["?"]
 
     # ── output ──────────────────────────────────────────────────────────
     def say(self, msg: str):

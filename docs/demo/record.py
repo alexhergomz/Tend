@@ -244,6 +244,15 @@ def stats():
     c.save()
 
 
+def states():
+    seed()
+    c = Cast("states", rows=30)
+    c.run("t start 2", after=1.5)
+    c.run("t wait 4 mon", after=1.5)
+    c.run("t ls", after=4)
+    c.save()
+
+
 def queue():
     seed()
     t("call the dentist")
@@ -255,7 +264,7 @@ def queue():
 if __name__ == "__main__":
     OUT.mkdir(parents=True, exist_ok=True)
     only = sys.argv[2:]
-    for fn in (capture, interactive, triage, focus, resolve, planning, review, stats, queue):
+    for fn in (capture, interactive, triage, focus, resolve, planning, review, stats, states, queue):
         if not only or fn.__name__ in only:
             print("recording", fn.__name__, flush=True)
             fn()

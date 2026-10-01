@@ -32,7 +32,9 @@ CREATE TABLE IF NOT EXISTS tasks (
     energy       TEXT CHECK (energy IN ('high', 'low')),
     first_due    TEXT,             -- first hard deadline, kept when the date moves
     first_aim    TEXT,             -- first soft target, kept when the date moves
-    pushes       INTEGER NOT NULL DEFAULT 0  -- times a date moved later
+    pushes       INTEGER NOT NULL DEFAULT 0, -- times a date moved later
+    stage        TEXT NOT NULL DEFAULT 'todo' CHECK (stage IN ('todo', 'started', 'waiting')),
+    started_at   TEXT              -- first time work started
 );
 CREATE TABLE IF NOT EXISTS goals (
     name       TEXT PRIMARY KEY,
@@ -58,19 +60,23 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT);
 """
-VERSION = 2
-NEW_COLUMNS = {  # added in schema version 2
+VERSION = 3
+NEW_COLUMNS = {
+    # version 2
     "energy": "TEXT CHECK (energy IN ('high', 'low'))",
     "first_due": "TEXT",
     "first_aim": "TEXT",
     "pushes": "INTEGER NOT NULL DEFAULT 0",
+    # version 3
+    "stage": "TEXT NOT NULL DEFAULT 'todo' CHECK (stage IN ('todo', 'started', 'waiting'))",
+    "started_at": "TEXT",
 }
-DEFAULTS = {"pushes": 0, "slips": 0}
+DEFAULTS = {"pushes": 0, "slips": 0, "stage": "todo"}
 
 COLS = [
     "id", "title", "goal", "parent", "value", "size", "estimate_min", "due", "aim",
     "start_after", "status", "slips", "skip_date", "created", "done_at",
-    "energy", "first_due", "first_aim", "pushes",
+    "energy", "first_due", "first_aim", "pushes", "stage", "started_at",
 ]
 NOT_UNDOABLE = ("rollover",)
 
@@ -95,8 +101,12 @@ class Store:
         added = [c for c in NEW_COLUMNS if c not in have]
         for c in added:
             self.db.execute(f"ALTER TABLE tasks ADD COLUMN {c} {NEW_COLUMNS[c]}")
-        if added:
+        if "pushes" in added:
             self._backfill_dates()
+        if "stage" in added:  # open tasks with focus time were started
+            self.db.execute("""UPDATE tasks SET stage = 'started',
+                started_at = (SELECT MIN(start) FROM sessions WHERE task_id = tasks.id)
+                WHERE status = 'open' AND id IN (SELECT task_id FROM sessions)""")
         self.db.execute(f"PRAGMA user_version = {VERSION}")
         self.db.commit()
 
