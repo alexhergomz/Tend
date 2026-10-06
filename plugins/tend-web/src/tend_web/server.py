@@ -10,6 +10,7 @@ import hmac
 import json
 import mimetypes
 import secrets
+import socketserver
 import sys
 import traceback
 from datetime import date, datetime
@@ -26,6 +27,14 @@ STATIC = resources.files("tend_web") / "static"
 MAX_BODY = 10 * 1024 * 1024
 
 
+class _HTTPServer(HTTPServer):
+    def server_bind(self):
+        """Like HTTPServer's, without looking up the computer's network name: that can take
+        many seconds (often on macOS), and a local server doesn't need it."""
+        socketserver.TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
+
+
 def _json(obj) -> bytes:
     def default(o):
         if isinstance(o, (date, datetime)):
@@ -40,7 +49,7 @@ class Server:
         self.app = app
         self.token = secrets.token_urlsafe(24)
         self.frames: dict[str, str] = {}  # one-time HTML pages from plugins, by a random id
-        self.httpd = HTTPServer(("127.0.0.1", port), self._handler())
+        self.httpd = _HTTPServer(("127.0.0.1", port), self._handler())
         self.port = self.httpd.server_address[1]
 
     @property

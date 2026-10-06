@@ -25,12 +25,18 @@ def web(tmp_path, monkeypatch):
         from tend.app import App
         from tend_web.server import Server
 
-        server = Server(App(), 0)
+        try:
+            server = Server(App(), 0)
+        except Exception as e:  # shown by the test instead of a timeout
+            started.put(e)
+            raise
         started.put(server)
         server.serve()
 
     threading.Thread(target=run, daemon=True).start()
-    server = started.get(timeout=10)
+    server = started.get(timeout=30)
+    if isinstance(server, Exception):
+        raise server
     yield Client(server)
     server.httpd.shutdown()
 
