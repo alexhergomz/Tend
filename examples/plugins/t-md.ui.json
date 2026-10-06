@@ -1,0 +1,6 @@
+{
+  "title": "Markdown checklist",
+  "panels": [
+    {"id": "checklist", "title": "Checklist", "run": [], "format": "markdown"}
+  ]
+}

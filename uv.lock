@@ -2,6 +2,12 @@ version = 1
 revision = 3
 requires-python = ">=3.11"
 
+[manifest]
+members = [
+    "tend-cli",
+    "tend-web",
+]
+
 [[package]]
 name = "colorama"
 version = "0.4.6"
@@ -157,6 +163,7 @@ dependencies = [
 dev = [
     { name = "pytest" },
     { name = "ruff" },
+    { name = "tend-web" },
 ]
 
 [package.metadata]
@@ -170,7 +177,19 @@ requires-dist = [
 dev = [
     { name = "pytest", specifier = ">=8" },
     { name = "ruff", specifier = ">=0.6" },
+    { name = "tend-web", editable = "plugins/tend-web" },
 ]
+
+[[package]]
+name = "tend-web"
+version = "1.0.0"
+source = { editable = "plugins/tend-web" }
+dependencies = [
+    { name = "tend-cli" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "tend-cli", editable = "." }]
 
 [[package]]
 name = "tzdata"

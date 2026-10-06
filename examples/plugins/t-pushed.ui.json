@@ -1,0 +1,9 @@
+{
+  "title": "Push-backs",
+  "panels": [
+    {"id": "most", "title": "Most pushed", "run": ["--table"], "format": "table"}
+  ],
+  "actions": [
+    {"id": "history", "title": "Date history", "where": "task", "run": ["{id}"], "format": "text"}
+  ]
+}

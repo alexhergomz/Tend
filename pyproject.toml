@@ -44,7 +44,7 @@ packages = ["src/tend"]
 include = ["src/tend", "tests", "docs/t.1", "docs/data.md", "README.md", "CHANGELOG.md", "ROADMAP.md", "LICENSE"]
 
 [dependency-groups]
-dev = ["pytest>=8", "ruff>=0.6"]
+dev = ["pytest>=8", "ruff>=0.6", "tend-web"]
 
 [tool.ruff]
 line-length = 120
@@ -54,5 +54,14 @@ target-version = "py311"
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
 ignore = ["E731", "SIM108", "RUF001", "RUF002", "RUF003", "B904"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["tend", "tend_web"]
+
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "plugins/tend-web/tests"]
+
+[tool.uv.workspace]
+members = ["plugins/tend-web"]
+
+[tool.uv.sources]
+tend-web = { workspace = true }

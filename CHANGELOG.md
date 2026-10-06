@@ -4,6 +4,14 @@ All notable changes to Tend. The format follows [Keep a Changelog](https://keepa
 and versions follow [Semantic Versioning](https://semver.org). From 1.0 on, the
 interfaces listed under "Stability" in the README only change in a new major version.
 
+## Unreleased
+
+### Added
+- The official web UI plugin, [tend-web](plugins/tend-web/README.md) 1.0.0: `t web`
+  opens Tend in your browser. It is a separate package; Tend itself is unchanged.
+- The example plugins `t-pushed` and `t-md` add pages and a button to the web UI.
+  `t-pushed` has two new modes: `--table` and a task number.
+
 ## 1.1.0 · 2026-10-01
 
 ### Added

@@ -52,12 +52,14 @@ trust. Changes after 1.0 are:
 - **Fixes,** in patch releases (1.0.1, 1.0.2, …).
 - **Small additions** that fit the rules above, in minor releases (1.1, 1.2, …).
   Each one is a feature you can turn off.
-- **Anything bigger starts as a plugin.** Good plugin ideas, which can all be
-  built on hooks, `--json` and the database:
+- **Anything bigger starts as a plugin.** The first official one is
+  [tend-web](plugins/tend-web/README.md), a local web UI that other plugins can
+  add pages and buttons to. Other good plugin ideas, which can all be built on
+  hooks, `--json` and the database:
   - **Sync between devices.** The database is one file, so Syncthing or similar
     works if only one device writes at a time. A real sync plugin can use the
     `on_change` hook and the `events` table.
-  - **Phone or web apps.**
+  - **Phone apps.**
   - **Habit streaks** from the `series` of a repeating task.
   - **Reports and charts** of focus time, goals and estimates.
   - **AI suggestions,** such as splitting tasks or guessing estimates.

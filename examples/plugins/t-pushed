@@ -1,30 +1,54 @@
 #!/usr/bin/env python3
-"""t pushed: show the tasks whose dates moved later most often, with their history.
+"""t pushed: the tasks whose dates moved later most often, with their history.
 
 Tend counts push-backs but doesn't act on them. This plugin reads the data
 directly from the database, as an example of building on it.
 
-Install: copy to a folder on your PATH and chmod +x.   Usage: t pushed
+    t pushed            the most pushed tasks, with the history of each date
+    t pushed 12         the date history of task 12
+    t pushed --table    the most pushed tasks as JSON, for the web UI (see t-pushed.ui.json)
+
+Install: copy to a folder on your PATH and chmod +x.
 """
 import json
 import os
 import sqlite3
+import sys
 
-db = sqlite3.connect(os.environ["TEND_DB"])  # set by tend for every plugin
+db = sqlite3.connect(os.environ["TEND_DB"])  # set by Tend for every plugin
 db.row_factory = sqlite3.Row
+args = sys.argv[1:]
+
+
+def history(task_id: int) -> list[str]:
+    """Every time a date of this task moved later, from the events table."""
+    lines = []
+    for ev in db.execute("SELECT ts, kind, changes FROM events WHERE undone = 0 ORDER BY id"):
+        for ch in json.loads(ev["changes"]):
+            before, after = ch.get("before") or {}, ch.get("after") or {}
+            if ch["id"] != task_id:
+                continue
+            for key in ("due", "aim"):
+                if before.get(key) and after.get(key) and after[key] > before[key]:
+                    lines.append(f"{ev['ts'][:10]}  {ev['kind']:<9} {key} {before[key]} → {after[key]}")
+    return lines
+
+
+if args and args[0].isdigit():
+    lines = history(int(args[0]))
+    print("\n".join(lines) if lines else "This task's dates never moved later.")
+    sys.exit()
+
 rows = db.execute("SELECT id, title, pushes, first_due, first_aim, due, aim FROM tasks "
                   "WHERE status = 'open' AND pushes > 0 ORDER BY pushes DESC LIMIT 10").fetchall()
+if "--table" in args:
+    print(json.dumps([{"task": f"#{r['id']} {r['title']}", "pushed": f"{r['pushes']}×",
+                       "first date": r["first_due"] or r["first_aim"], "now": r["due"] or r["aim"]} for r in rows]))
+    sys.exit()
 if not rows:
     print("No task has been pushed back.")
 for r in rows:
     first, now = (r["first_due"], r["due"]) if r["first_due"] else (r["first_aim"], r["aim"])
     print(f"#{r['id']}  {r['title']}  ·  pushed {r['pushes']}×  ·  first date {first}, now {now}")
-    # every date change is in the events table, with the row before and after
-    for ev in db.execute("SELECT ts, kind, changes FROM events WHERE undone = 0 ORDER BY id"):
-        for ch in json.loads(ev["changes"]):
-            before, after = ch.get("before") or {}, ch.get("after") or {}
-            if ch["id"] != r["id"]:
-                continue
-            for key in ("due", "aim"):
-                if before.get(key) and after.get(key) and after[key] > before[key]:
-                    print(f"      {ev['ts'][:10]}  {ev['kind']:<9} {key} {before[key]} → {after[key]}")
+    for line in history(r["id"]):
+        print(f"      {line}")

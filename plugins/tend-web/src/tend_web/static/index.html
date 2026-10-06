@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tend</title>
+  <link rel="icon" href="static/icon.svg">
+  <link rel="stylesheet" href="static/style.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="side">
+      <div class="brand">
+        <svg viewBox="0 0 128 128" aria-hidden="true"><rect width="128" height="128" rx="28" fill="currentColor" opacity=".08"/><path d="M30 44 H86 M58 44 V102" fill="none" stroke="currentColor" stroke-width="13" stroke-linecap="round"/><path d="M86 47 C88 29 98 18 113 15 C111 33 102 45 86 47 Z" fill="var(--accent)"/></svg>
+        <b>Tend</b>
+      </div>
+      <nav class="nav" id="nav"></nav>
+      <div class="side-foot"><span id="version"></span><span class="spacer"></span><button class="btn ghost small" id="theme" title="Light or dark">◐</button></div>
+    </aside>
+    <main class="main">
+      <div class="top">
+        <form class="capture" id="capture" autocomplete="off">
+          <span class="plus">+</span>
+          <input id="capture-input" placeholder="Add a task…   try: call the dentist due:fri v:2 e:20m" aria-label="Add a task">
+          <div class="preview" id="preview"></div>
+        </form>
+      </div>
+      <div id="page"></div>
+    </main>
+  </div>
+  <div class="toasts" id="toasts"></div>
+  <div id="layer"></div>
+  <script src="static/app.js"></script>
+</body>
+</html>

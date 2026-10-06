@@ -50,7 +50,7 @@
 - **Planning:** [Plan and gantt](#planning-t-plan-and-t-gantt) · [Energy windows](#energy-windows) ·
   [Reminders](#reminders) · [Learning from your history](#learning-from-your-history)
 - **Reference:** [Commands](#commands) · [Adding details](#adding-details) · [Settings](#settings) ·
-  [Hooks and plugins](#hooks-and-plugins) · [Your data](#your-data) ·
+  [Hooks and plugins](#hooks-and-plugins) · [Web UI](#web-ui) · [Your data](#your-data) ·
   [When something is wrong](#when-something-is-wrong) · [Stability](#stability)
 
 ## Why
@@ -74,6 +74,7 @@ Other design choices:
 - Tend learns from your history: how long tasks really take, and how late you
   usually finish compared to your dates. It corrects for both.
 - Everything beyond the core can be [turned off](#features).
+- Prefer buttons on a hard day? The [web UI plugin](#web-ui) opens Tend in your browser.
 - Your data is a plain SQLite file. Every command can print JSON.
 
 ## Install
@@ -630,7 +631,9 @@ lists what is installed.
 Examples in `examples/plugins/`:
 
 - `t-md` prints the queue as a Markdown checklist (`t md > todo.md`).
-- `t-pushed` lists the most pushed-back tasks with the history of each date.
+- `t-pushed` lists the most pushed-back tasks with the history of each date. Its
+  `t-pushed.ui.json` adds a page and a button to the [web UI](#web-ui), and `t-md.ui.json`
+  adds a checklist page.
 - `t-import-todotxt`, `t-import-taskwarrior` and `t-import-csv` move your tasks
   from other apps (see [Moving from another app](#moving-from-another-app)).
 
@@ -666,6 +669,22 @@ The hook gets the event as JSON on stdin:
 Hooks run in the background. They can't slow Tend down or change what it does.
 Their output goes to `hooks.log`, next to the database. `examples/hooks/on_done`
 appends each finished task to a CSV file.
+
+### Web UI
+
+The official plugin [tend-web](plugins/tend-web/README.md) opens a calm, simple
+version of Tend in your browser, for days when buttons are easier than commands.
+It has every feature: the next task, the queue, triage, slipped tasks, the plan
+and week chart, goals, wins, patterns, the weekly review, a full-screen focus
+timer, and settings. It only runs on your own computer, and other plugins can add
+their own pages and buttons to it.
+
+```sh
+pipx inject tend-cli tend-web --include-apps     # or: uv tool install tend-cli --with-executables-from tend-web
+t web
+```
+
+![The web UI: the one next task, with big buttons](https://raw.githubusercontent.com/alexhergomz/Tend/main/plugins/tend-web/docs/now.png)
 
 ## Your data
 
