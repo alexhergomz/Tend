@@ -19,4 +19,17 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: uv sync
       - run: uv run ruff check src tests
-      - run: uv run pytest -q
+      - name: tests
+        shell: bash
+        run: |
+          uv run pytest -q --junitxml=report.xml || {
+            uv run python -c "
+          import xml.etree.ElementTree as ET
+          for case in ET.parse('report.xml').iter('testcase'):
+              for bad in list(case.findall('failure')) + list(case.findall('error')):
+                  text = ((bad.get('message') or '') + chr(10) + (bad.text or ''))[-1500:]
+                  text = text.replace('%', '%25').replace(chr(13), '').replace(chr(10), '%0A')
+                  print(f\"::error title={case.get('classname')}.{case.get('name')}::{text}\")
+          "
+            exit 1
+          }
